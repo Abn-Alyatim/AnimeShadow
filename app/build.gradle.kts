@@ -25,6 +25,11 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
+// v1.2: AniList login (OAuth implicit grant). The client id is public (not a secret) and empty by default: the login
+// button then explains that it isn't activated yet. Set -PanilistClientId=12345 or anilist.clientId=12345 in local.properties.
+val aniListClientId: String = ((project.findProperty("anilistClientId") as String?) ?: localProps.getProperty("anilist.clientId") ?: "").trim()
+// v1.2: Google's TEST ad units only (never real ones in this build). -PadsEnabled=false removes the banner.
+val adsEnabled: Boolean = ((project.findProperty("adsEnabled") as String?) ?: "true").toBoolean()
 val myMemoryEmail: String = (project.findProperty("mymemoryEmail") as String?) ?: localProps.getProperty("mymemory.email") ?: ""
 
 android {
@@ -35,11 +40,16 @@ android {
         applicationId = "com.animeshadow.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("String", "MYMEMORY_EMAIL", "\"${myMemoryEmail.replace("\"", "")}\"")
+        buildConfigField("String", "ANILIST_CLIENT_ID", "\"${aniListClientId.filter { it.isDigit() }}\"")
+        buildConfigField("String", "ANILIST_REDIRECT", "\"animeshadow://anilist-auth\"")
+        buildConfigField("boolean", "ADS_ENABLED", adsEnabled.toString())
+        buildConfigField("String", "ADS_BANNER_UNIT", "\"ca-app-pub-3940256099942544/9214589741\"")
+        manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
     }
 
     signingConfigs {
@@ -143,6 +153,7 @@ dependencies {
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp)
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.play.services.ads)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

@@ -31,6 +31,8 @@ class AppSmokeTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx get() = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    @org.junit.Before fun noSplash() { SplashConfig.enabled = false }
+
     @Test fun every_drawer_destination_opens() {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForIdle()

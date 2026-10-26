@@ -52,6 +52,19 @@ import com.animeshadow.app.data.AnimeRepository
 import com.animeshadow.app.data.BackupManager
 import com.animeshadow.app.data.LibraryRepository
 import com.animeshadow.app.data.settings.Settings
+import com.animeshadow.app.data.auth.AniListAccount
+import com.animeshadow.app.data.auth.AniListAuthRepository
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import com.animeshadow.app.data.settings.SettingsRepository
 import com.animeshadow.app.sync.SyncScheduler
 import com.animeshadow.app.ui.common.AppTopBar
@@ -83,8 +96,12 @@ class SettingsViewModel @Inject constructor(
     private val anime: AnimeRepository,
     private val clock: Clock,
     @ApplicationContext private val context: Context,
+    private val auth: AniListAuthRepository,
 ) : ViewModel() {
     val ui: StateFlow<Settings> = settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
+    val account: StateFlow<AniListAccount> = auth.account
+    fun loginUrl(): String? = auth.authorizeUrl()
+    fun logout() = auth.logout()
     private val _events = Channel<SettingsEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
@@ -136,17 +153,39 @@ class SettingsActions(
     val onClearHistory: () -> Unit = {},
     val onClearAll: () -> Unit = {},
     val onShare: () -> Unit = {},
+    /** Only called when a client id is configured (otherwise the calm «not activated yet» dialog shows). */
+    val onLogin: () -> Unit = {},
+    val onLogout: () -> Unit = {},
+    val onDeveloper: () -> Unit = {},
 )
 
 @Composable
-fun SettingsContent(s: Settings, onMenu: () -> Unit, actions: SettingsActions, snackbar: SnackbarHostState = remember { SnackbarHostState() }) {
-    var dialog by remember { mutableStateOf<String?>(null) }
+fun SettingsContent(
+    s: Settings,
+    onMenu: () -> Unit,
+    actions: SettingsActions,
+    snackbar: SnackbarHostState = remember { SnackbarHostState() },
+    account: AniListAccount = AniListAccount(configured = BuildConfig.ANILIST_CLIENT_ID.isNotBlank()),
+) {
+    var dialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     Scaffold(
         containerColor = Palette.Black,
         topBar = { AppTopBar(stringResource(R.string.nav_settings), onMenu = onMenu) },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
-        LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(Modifier.padding(pad).fillMaxSize().testTag("settings_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
+            // v1.2: AniList login (optional; behind config).
+            item { Header(stringResource(R.string.settings_account)) }
+            item {
+                if (account.loggedIn) {
+                    AccountRow(account, actions.onLogout)
+                } else {
+                    ClickRow(stringResource(R.string.anilist_login), stringResource(R.string.anilist_login_sub), tag = "anilist_login") {
+                        if (account.configured) actions.onLogin() else dialog = "anilist_off"
+                    }
+                }
+            }
+
             item { Header(stringResource(R.string.settings_general)) }
             item { SwitchRow(stringResource(R.string.settings_notify_all), stringResource(R.string.settings_notify_all_sub), s.notifications, actions.onNotifications) }
             item { SwitchRow(stringResource(R.string.settings_save_filter), stringResource(R.string.settings_save_filter_sub), s.saveFilters, actions.onSaveFilters) }
@@ -172,7 +211,11 @@ fun SettingsContent(s: Settings, onMenu: () -> Unit, actions: SettingsActions, s
             item { Header(stringResource(R.string.settings_other)) }
             item { ClickRow(stringResource(R.string.settings_share), null, onClick = actions.onShare) }
             item { ClickRow(stringResource(R.string.settings_disclaimer), null) { dialog = "disclaimer" } }
-            item { ClickRow(stringResource(R.string.settings_about), "v" + BuildConfig.VERSION_NAME) { dialog = "about" } }
+
+            // v1.2: «عن التطبيق» with the developer row (taps open WhatsApp).
+            item { Header(stringResource(R.string.settings_about_header)) }
+            item { ClickRow(stringResource(R.string.settings_version), "v" + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")", tag = "about_row") { dialog = "about" } }
+            item { DeveloperRow(actions.onDeveloper) }
         }
     }
     when (dialog) {
@@ -192,10 +235,17 @@ fun SettingsContent(s: Settings, onMenu: () -> Unit, actions: SettingsActions, s
             confirmButton = { TextButton(onClick = { actions.onClearAll(); dialog = null }) { Text(stringResource(R.string.delete), color = Palette.Dropped) } },
             dismissButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.cancel)) } },
         )
+        "anilist_off" -> AlertDialog(
+            onDismissRequest = { dialog = null }, containerColor = Palette.Card,
+            modifier = Modifier.testTag("anilist_off_dialog"),
+            title = { Text(stringResource(R.string.anilist_not_active_title), style = MaterialTheme.typography.headlineSmall.mixed()) },
+            text = { Text(stringResource(R.string.anilist_not_active_text), style = MaterialTheme.typography.bodyMedium.mixed()) },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.ok)) } },
+        )
         "disclaimer", "about" -> AlertDialog(
             onDismissRequest = { dialog = null }, containerColor = Palette.Card,
             title = { Text(stringResource(R.string.app_name)) },
-            text = { Text(if (dialog == "about") stringResource(R.string.about_text, BuildConfig.VERSION_NAME) else stringResource(R.string.disclaimer_text)) },
+            text = { Text(if (dialog == "about") stringResource(R.string.about_text, BuildConfig.VERSION_NAME) else stringResource(R.string.disclaimer_text), style = MaterialTheme.typography.bodyMedium.mixed()) },
             confirmButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.ok)) } },
         )
     }
@@ -219,10 +269,55 @@ private fun SwitchRow(title: String, sub: String?, checked: Boolean, onChange: (
 }
 
 @Composable
-private fun ClickRow(title: String, sub: String?, danger: Boolean = false, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = if (danger) Palette.Dropped else Palette.Text)
-        if (sub != null) Text(sub, style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+private fun ClickRow(title: String, sub: String?, danger: Boolean = false, tag: String? = null, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().then(if (tag != null) Modifier.testTag(tag) else Modifier).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyLarge.mixed(), color = if (danger) Palette.Dropped else Palette.Text)
+        if (sub != null) Text(sub, style = MaterialTheme.typography.bodySmall.mixed(), color = Palette.TextMuted)
+    }
+    HorizontalDivider(color = Palette.Divider, modifier = Modifier.padding(horizontal = 16.dp))
+}
+
+/**
+ * v1.2 bidi fix: Arabic text that contains Latin words («تسجيل الدخول بحساب AniList») came out in the wrong word
+ * order, because an unspecified text direction follows the (left-to-right) layout. Content direction orders the
+ * words correctly; the alignment stays left like every other row.
+ */
+private fun androidx.compose.ui.text.TextStyle.mixed() =
+    copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content, textAlign = androidx.compose.ui.text.style.TextAlign.Left)
+
+/** «المطوّر»: name (Arabic / English) and the WhatsApp number; tapping opens wa.me. */
+@Composable
+private fun DeveloperRow(onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().testTag("developer_row").clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_developer), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.developer_name), style = MaterialTheme.typography.bodyMedium.mixed(), color = Palette.TextSecondary)
+            // Latin digits, isolated so "+967…" never flips inside Arabic text.
+            Text("\u2066" + stringResource(R.string.developer_phone) + "\u2069", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.Chat, stringResource(R.string.cd_whatsapp),
+            tint = Color(0xFF25D366), modifier = Modifier.size(24.dp),
+        )
+    }
+    HorizontalDivider(color = Palette.Divider, modifier = Modifier.padding(horizontal = 16.dp))
+}
+
+@Composable
+private fun AccountRow(account: AniListAccount, onLogout: () -> Unit) {
+    Row(Modifier.fillMaxWidth().testTag("anilist_account").padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (account.avatar != null) {
+            coil.compose.AsyncImage(account.avatar, null, Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            Spacer(Modifier.width(12.dp))
+        }
+        Text(
+            stringResource(R.string.anilist_logged_in_as, "\u2068" + (account.name ?: "AniList") + "\u2069"),
+            style = MaterialTheme.typography.bodyLarge.mixed(), modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onLogout) { Text(stringResource(R.string.anilist_logout), color = Palette.Accent) }
     }
     HorizontalDivider(color = Palette.Divider, modifier = Modifier.padding(horizontal = 16.dp))
 }
@@ -246,9 +341,20 @@ private fun <T> ChoiceDialog(title: String, options: List<Pair<T, String>>, sele
     )
 }
 
+/** Opens a link in the browser / WhatsApp; a calm toast when no app can open it. */
+fun openUrl(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (_: android.content.ActivityNotFoundException) {
+        android.widget.Toast.makeText(context, R.string.no_app_to_open, android.widget.Toast.LENGTH_SHORT).show()
+    }
+}
+
 @Composable
 fun SettingsScreen(onMenu: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val s by vm.ui.collectAsStateWithLifecycle()
+    val account by vm.account.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> if (uri != null) vm.export(uri) }
@@ -287,7 +393,11 @@ fun SettingsScreen(onMenu: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
                 val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_text)) }
                 runCatching { context.startActivity(Intent.createChooser(send, null)) }
             },
+            onLogin = { vm.loginUrl()?.let { openUrl(context, it) } },
+            onLogout = { vm.logout() },
+            onDeveloper = { openUrl(context, context.getString(R.string.developer_whatsapp_url)) },
         ),
         snackbar,
+        account,
     )
 }

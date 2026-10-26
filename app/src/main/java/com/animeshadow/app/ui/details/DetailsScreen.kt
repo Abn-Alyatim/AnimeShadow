@@ -310,7 +310,7 @@ fun DetailsContent(ui: DetailsUi, actions: DetailsActions, initialTab: Int = 0) 
             // Ref 11: tabs start at the LEFT, sized to their text (the 4th is cut at the right edge), short white underline.
             RefTabs(tabs.map { stringResource(it) }, tab) { tab = it }
             (ui.refresh as? Refresh.Failed)?.let {
-                StatusBanner(if (it.offline) stringResource(R.string.offline_cached) else stringResource(R.string.load_failed, it.message ?: ""), onRetry = actions.onRetry)
+                StatusBanner(if (it.offline) stringResource(R.string.offline_cached) else stringResource(R.string.load_failed))
             }
             val anime = ui.anime
             if (anime == null) {

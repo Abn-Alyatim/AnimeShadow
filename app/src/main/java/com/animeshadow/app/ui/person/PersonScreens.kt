@@ -158,7 +158,7 @@ private fun MiniCard(title: String, image: String?, sub: String?, onClick: () ->
 }
 
 @Composable
-fun CharacterContent(ui: CharacterUi, onBack: () -> Unit, onFavorite: () -> Unit, onOpenAnime: (Int) -> Unit, onOpenStaff: (Int) -> Unit, onRetry: () -> Unit) {
+fun CharacterContent(ui: CharacterUi, onBack: () -> Unit, onFavorite: () -> Unit, onOpenAnime: (Int) -> Unit, onOpenStaff: (Int) -> Unit, @Suppress("UNUSED_PARAMETER") onRetry: () -> Unit) {
     val c = ui.character
     Scaffold(
         containerColor = Palette.Black,
@@ -175,7 +175,7 @@ fun CharacterContent(ui: CharacterUi, onBack: () -> Unit, onFavorite: () -> Unit
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            (ui.refresh as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.empty_feed), onRetry = onRetry) }
+            (ui.refresh as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.load_failed)) }
             when {
                 c == null && ui.refresh == null -> LoadingBox()
                 c == null -> EmptyState(stringResource(R.string.empty_feed))
@@ -214,11 +214,11 @@ fun CharacterContent(ui: CharacterUi, onBack: () -> Unit, onFavorite: () -> Unit
 }
 
 @Composable
-fun StaffContent(ui: StaffUi, onBack: () -> Unit, onOpenAnime: (Int) -> Unit, onOpenCharacter: (Int) -> Unit, onRetry: () -> Unit) {
+fun StaffContent(ui: StaffUi, onBack: () -> Unit, onOpenAnime: (Int) -> Unit, onOpenCharacter: (Int) -> Unit, @Suppress("UNUSED_PARAMETER") onRetry: () -> Unit) {
     val s = ui.staff
     Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(s?.name.orEmpty(), onBack = onBack) }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            (ui.refresh as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.empty_feed), onRetry = onRetry) }
+            (ui.refresh as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.load_failed)) }
             when {
                 s == null && ui.refresh == null -> LoadingBox()
                 s == null -> EmptyState(stringResource(R.string.empty_feed))

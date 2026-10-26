@@ -51,10 +51,9 @@
     <string name="ws_DROPPED">لا ارغب بمشاهدتها</string>
     <string name="not_in_list">أضف لقائمتي</string>
     <string name="remove_from_list">إزالة من قائمتي</string>
-    <string name="offline_cached">لا يوجد اتصال — نعرض البيانات المحفوظة</string>
-    <string name="load_failed">تعذر التحديث: %1$s</string>
-    <string name="retry">إعادة المحاولة</string>
-    <string name="empty_feed">لا توجد بيانات محفوظة بعد. اتصل بالإنترنت لتحميل الأنميات.</string>
+    <string name="offline_cached">لا يوجد اتصال — نعرض البيانات المحفوظة. اسحب للأسفل للتحديث</string>
+    <string name="load_failed">تعذر التحديث الآن — اسحب للأسفل للمحاولة مرة أخرى</string>
+    <string name="empty_feed">لا توجد بيانات محفوظة بعد. اتصل بالإنترنت ثم اسحب للأسفل للتحديث.</string>
     <string name="empty_list">لا توجد أنميات هنا بعد.</string>
     <string name="empty_favorites">لا توجد مفضلة بعد. اضغط ♥ في صفحة أنمي أو شخصية.</string>
     <string name="empty_history">لم تشاهد شيئاً بعد. حدّد الحلقات من تبويب الحلقات.</string>
@@ -194,9 +193,8 @@
     <string name="settings_other">اخرى</string>
     <string name="settings_share">مشاركة التطبيق</string>
     <string name="settings_disclaimer">اخلاء المسؤولية</string>
-    <string name="settings_about">حول</string>
     <string name="disclaimer_text">ANIME SHADOW تطبيق شخصي للتتبع، لا يبث ولا يستضيف أي فيديو. معلومات وصور الأنمي من AniList (وMyAnimeList عبر Jikan) وهي ملك أصحابها.</string>
-    <string name="about_text">ANIME SHADOW %1$s — Your Anime. Your Journey. البيانات: AniList وJikan (MyAnimeList).</string>
+    <string name="about_text">ANIME SHADOW %1$s — Your Anime. Your Journey. البيانات: AniList وJikan (MyAnimeList).\n\nالمطوّر: مدين اليتيم / Madyan AL-Yatim</string>
     <string name="share_text">ANIME SHADOW — مكتبتي ومتتبع حلقات الأنمي.</string>
     <string name="notif_channel">حلقات جديدة</string>
     <string name="notif_new_episode">نزلت الحلقة %1$s</string>

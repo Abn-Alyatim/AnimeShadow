@@ -6,6 +6,15 @@
 
 ## العربية
 
+### الجديد في 1.2.0 (versionCode 4)
+- **السحب للتحديث يشتغل الآن في كل القوائم**: الرئيسية، الأعلى تقييماً، المواسم، البحث، التصنيف، الاستوديو، قائمتي، المفضلة، السجل، الشخصيات الأكثر شعبية، التوصيات، الجدول. السبب أنه كان لا يفعل شيئاً: في 1.1 لم يكن هناك سحب للتحديث أصلاً في أي شاشة، وأي تحديث يدوي أثناء التحميل الأول كان يُتجاهل، والقوائم الفارغة لا تُسحب. الآن السحب يجلب من AniList فعلاً ويعرض البيانات الجديدة (مع اختبار).
+- **لا يوجد زر «إعادة المحاولة»**: الشريط يقول بهدوء «اسحب للأسفل للتحديث»، وبدون نص إنجليزي تقني.
+- **أنميشن التحميل**: مقطع Shadow حقك (3.4 ثانية) صغير على أسود، يتكرر بدون أي قطع، ثم يتلاشى إلى الواجهة. نفس المقطع مكان دائرة التحميل في القوائم. (WebP متحرك 490KB بجودة مطابقة للأصل، وأطرافه تذوب في الأسود.)
+- **تسجيل الدخول بحساب AniList** (اختياري): جاهز، ويُفعَّل برقم العميل. قبل التفعيل يشرح الزر بهدوء أنه لم يُفعَّل بعد. الخطوات في `ANILIST_SETUP_AR.md`.
+- **إعلان صغير تجريبي** (Google Test 320×50) أسفل شاشات القوائم فقط. لا إعلانات منبثقة ولا فيديو ولا صوت، ويبدأ في الخلفية بعد ظهور الشاشة الأولى فلا يبطئ التشغيل.
+- **«عن التطبيق» ← «المطوّر»**: مدين اليتيم / Madyan AL-Yatim ‎+967780647484، والضغط يفتح واتساب.
+- **إصلاحات**: التدوير لم يعد يفتح الأنمي من الإشعار مرة ثانية، زر الرجوع يغلق القائمة الجانبية أولاً، نوافذ الإعدادات لا تختفي عند التدوير، زر البحث في الكيبورد يبحث فوراً، قائمتي أسرع مع القوائم الطويلة، ترتيب الكلمات صحيح في النصوص العربية التي فيها كلمات إنجليزية.
+
 ### الجديد في 1.1.1 (versionCode 3)
 - **الخط الصحيح**: Noto Naskh Arabic UI (خط النسخ الذي يستعمله أندرويد نفسه، وهو خط صورتك المرجعية 11)، مرفق برخصة SIL OFL، واللاتيني والأرقام بخط Roboto كما في المرجع.
 - **المقاسات مأخوذة من صورك**: جوالك عرضه 360dp، وحجم الخط فيه ~1.075، وخيار «الخط العريض» مفعّل. النص 14sp، والأسطر الرمادية الصغيرة 12sp، والعنوان 15sp، والشريط العلوي 20sp، ونفس الأوزان.
@@ -72,6 +81,15 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`. نسخة release تُوقّع 
 ---
 
 ## English
+
+### What's new in 1.2.0 (versionCode 4)
+- **Pull-to-refresh on every list screen** (Latest, Top, Seasons, Browse/Search, Genre, Studio, My List, Favorite anime, History, Popular characters, Recommendations, Schedule). Why it did nothing in 1.1: there was no pull-to-refresh component on any screen; a forced refresh issued while the automatic first load was running was dropped; and empty/error states were not scrollable, so a pull could not start there. A pull now always re-fetches from AniList and the list shows the new data (tested with a server that answers list A, then list B).
+- **No retry buttons** (golden rule): banners say "pull down to refresh", never raw English exception text.
+- **Loading animation**: Madyan's 3.4 s Shadow loop, small on black, gapless (animated WebP played by AnimatedImageDrawable on the render thread), then a 450 ms fade into the UI; the same loop replaces the list spinners. 640×360, 103 frames, 505 KB, 37–44 dB PSNR vs. the source, edges feathered to pure black.
+- **AniList login behind config**: OAuth implicit grant, `-PanilistClientId=` / `anilist.clientId=` (empty by default → a calm Arabic "not activated yet" dialog). Redirect `animeshadow://anilist-auth`. See `ANILIST_SETUP_AR.md`.
+- **Ads**: one Google TEST banner (320×50) under list screens only; no interstitials, pop-ups, video or sound; SDK initialised lazily off the main thread (plus OPTIMIZE_INITIALIZATION / OPTIMIZE_AD_LOADING). `-PadsEnabled=false` removes it. APK 6.0 MB.
+- **About → Developer** row: مدين اليتيم / Madyan AL-Yatim, +967780647484, opens https://wa.me/967780647484.
+- **Bug fixes**: rotation re-opened a notification's anime; Back with the drawer open left the screen; settings dialogs lost on rotation; keyboard search key waited for the debounce; Browse pull blanked results; load-more spinner during a pull; stale load-more page appended after switching season; overlapping schedule loads; O(n²) progress lookup in My List; wrong word order in Arabic strings containing Latin words.
 
 ### What's new in 1.1.1 (versionCode 3)
 - **Correct font**: Noto Naskh Arabic UI (Android's own Naskh, the font in reference 11), bundled under SIL OFL, with Roboto for Latin text and digits as in the reference.

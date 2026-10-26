@@ -71,6 +71,9 @@ import com.animeshadow.app.domain.LibraryFilter
 import com.animeshadow.app.ui.common.AnimeGrid
 import com.animeshadow.app.ui.common.EmptyState
 import com.animeshadow.app.ui.common.LoadingBox
+import com.animeshadow.app.ui.common.Refreshable
+import com.animeshadow.app.ui.ads.ListAdBanner
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.animeshadow.app.ui.common.SelectChip
 import com.animeshadow.app.ui.common.StatusBanner
 import com.animeshadow.app.ui.common.formatRes
@@ -98,6 +101,8 @@ data class BrowseUi(
     val fromCache: Boolean = false,
     val error: String? = null,
     val grid: Boolean = true,
+    /** v1.2: pull-to-refresh running; the current results stay on screen. */
+    val refreshing: Boolean = false,
 )
 
 @HiltViewModel
@@ -124,6 +129,12 @@ class BrowseViewModel @Inject constructor(
         load(reset = true)
     }
 
+    /** Keyboard "search" key: search now (v1.1 waited for the 450 ms typing debounce again). */
+    fun submit() = load(reset = true)
+
+    /** Pull-to-refresh: the same query again from AniList, page 1. */
+    fun refresh() = load(reset = true, pull = true)
+
     fun loadMore() {
         val s = _ui.value
         if (s.loading || !s.hasNext) return
@@ -132,23 +143,23 @@ class BrowseViewModel @Inject constructor(
 
     fun toggleGrid() = viewModelScope.launch { settings.setGridMode(!_ui.value.grid) }
 
-    private fun load(reset: Boolean, debounceMs: Long = 0) {
+    private fun load(reset: Boolean, debounceMs: Long = 0, pull: Boolean = false) {
         if (reset) job?.cancel()
         job = viewModelScope.launch {
             if (debounceMs > 0) delay(debounceMs)
             val q = _ui.value.query
             val page = if (reset) 1 else _ui.value.page + 1
-            _ui.update { it.copy(loading = true, error = null, items = if (reset) emptyList() else it.items) }
+            _ui.update { it.copy(loading = true, error = null, refreshing = pull, items = if (reset && !pull) emptyList() else it.items) }
             repo.browse(q, page).fold(
                 { r ->
                     _ui.update {
                         it.copy(
                             items = if (reset) r.items else (it.items + r.items).distinctBy { a -> a.id },
-                            page = page, hasNext = r.hasNext, loading = false, fromCache = r.fromCache,
+                            page = page, hasNext = r.hasNext, loading = false, fromCache = r.fromCache, refreshing = false,
                         )
                     }
                 },
-                { e -> _ui.update { it.copy(loading = false, error = e.message ?: "error", hasNext = false) } },
+                { e -> _ui.update { it.copy(loading = false, error = e.message ?: "error", hasNext = false, refreshing = false) } },
             )
         }
     }
@@ -166,10 +177,13 @@ fun BrowseContent(
     onToggleGrid: () -> Unit,
     onOpen: (AnimeEntity) -> Unit,
     onLoadMore: () -> Unit,
+    onSubmit: () -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     var showSort by remember { mutableStateOf(false) }
     var showFilter by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     if (autoFocus) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Scaffold(
         containerColor = Palette.Black,
@@ -188,7 +202,7 @@ fun BrowseContent(
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = Palette.RefText, textAlign = TextAlign.Right, fontSize = 17.sp),
                         cursorBrush = SolidColor(Palette.Blue),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { onSearch(ui.query.search) }),
+                        keyboardActions = KeyboardActions(onSearch = { onSubmit(); keyboard?.hide() }),
                         decorationBox = { inner ->
                             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                                 if (ui.query.search.isEmpty()) {
@@ -215,14 +229,17 @@ fun BrowseContent(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Black),
             )
         },
+        bottomBar = { ListAdBanner() },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (ui.fromCache) StatusBanner(stringResource(R.string.search_offline))
-            ui.error?.let { StatusBanner(stringResource(R.string.load_failed, it)) }
-            when {
-                ui.items.isEmpty() && ui.loading -> LoadingBox()
-                ui.items.isEmpty() -> EmptyState(stringResource(R.string.empty_list))
-                else -> AnimeGrid(ui.items, ui.grid, onOpen, onEndReached = onLoadMore, loadingMore = ui.loading && ui.page > 0)
+            ui.error?.let { StatusBanner(stringResource(R.string.load_failed)) }
+            Refreshable(ui.refreshing && ui.items.isNotEmpty(), onRefresh, Modifier.weight(1f)) {
+                when {
+                    ui.items.isEmpty() && ui.loading -> LoadingBox()
+                    ui.items.isEmpty() -> EmptyState(stringResource(R.string.empty_list))
+                    else -> AnimeGrid(ui.items, ui.grid, onOpen, onEndReached = onLoadMore, loadingMore = ui.loading && !ui.refreshing && ui.page > 0)
+                }
             }
         }
     }
@@ -311,5 +328,5 @@ fun FilterGroup(title: String, content: @Composable () -> Unit) {
 @Composable
 fun BrowseScreen(autoFocus: Boolean, onMenu: () -> Unit, onBack: (() -> Unit)?, onOpen: (Int) -> Unit, vm: BrowseViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    BrowseContent(ui, autoFocus, onMenu, onBack, vm::setSearch, vm::setQuery, { vm.toggleGrid() }, { onOpen(it.id) }, vm::loadMore)
+    BrowseContent(ui, autoFocus, onMenu, onBack, vm::setSearch, vm::setQuery, { vm.toggleGrid() }, { onOpen(it.id) }, vm::loadMore, vm::submit, vm::refresh)
 }

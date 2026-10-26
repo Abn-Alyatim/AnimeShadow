@@ -31,6 +31,8 @@ import com.animeshadow.app.ui.common.AnimeGrid
 import com.animeshadow.app.ui.common.AppTopBar
 import com.animeshadow.app.ui.common.EmptyState
 import com.animeshadow.app.ui.common.LoadingBox
+import com.animeshadow.app.ui.common.Refreshable
+import com.animeshadow.app.ui.ads.ListAdBanner
 import com.animeshadow.app.ui.common.SelectChip
 import com.animeshadow.app.ui.common.StatusBanner
 import com.animeshadow.app.ui.common.label
@@ -47,7 +49,8 @@ fun GridToggle(grid: Boolean, onToggle: () -> Unit) {
 
 @Composable
 fun refreshMessage(ui: FeedUi): String? = ui.error?.let {
-    if (it.offline) stringResource(R.string.offline_cached) else stringResource(R.string.load_failed, it.message ?: "")
+    // v1.2: never the raw (English) exception text; the banner says what to do (pull), and there is no retry button.
+    if (it.offline) stringResource(R.string.offline_cached) else stringResource(R.string.load_failed)
 }
 
 /** Shared body of Latest Updates / Top Rated / Seasons. */
@@ -60,7 +63,7 @@ fun FeedContent(
     onToggleGrid: () -> Unit,
     onOpen: (AnimeEntity) -> Unit,
     onLoadMore: () -> Unit,
-    onRetry: () -> Unit,
+    onRefresh: () -> Unit,
     header: (@Composable () -> Unit)? = null,
     cornerBadge: (AnimeEntity) -> String? = { null },
 ) {
@@ -72,10 +75,11 @@ fun FeedContent(
                 GridToggle(ui.grid, onToggleGrid)
             }
         },
+        bottomBar = { ListAdBanner() },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            refreshMessage(ui)?.let { StatusBanner(it, onRetry = onRetry) }
-            Box(Modifier.weight(1f)) {
+            refreshMessage(ui)?.let { StatusBanner(it) }
+            Refreshable(refreshing = ui.refreshing && ui.items.isNotEmpty(), onRefresh = onRefresh, modifier = Modifier.weight(1f)) {
                 when {
                     ui.items.isEmpty() && (ui.refreshing || !ui.loaded) && ui.error == null -> Column {
                         header?.invoke()
@@ -130,10 +134,10 @@ fun SeasonPicker(pick: SeasonPick, onPick: (SeasonPick) -> Unit, thisYear: Int) 
 @Composable
 fun SeasonsContent(
     ui: FeedUi, pick: SeasonPick, thisYear: Int, onMenu: () -> Unit, onSearch: () -> Unit, onToggleGrid: () -> Unit,
-    onPick: (SeasonPick) -> Unit, onOpen: (AnimeEntity) -> Unit, onLoadMore: () -> Unit, onRetry: () -> Unit,
+    onPick: (SeasonPick) -> Unit, onOpen: (AnimeEntity) -> Unit, onLoadMore: () -> Unit, onRefresh: () -> Unit,
 ) {
     FeedContent(
-        stringResource(R.string.nav_seasons), ui, onMenu, onSearch, onToggleGrid, onOpen, onLoadMore, onRetry,
+        stringResource(R.string.nav_seasons), ui, onMenu, onSearch, onToggleGrid, onOpen, onLoadMore, onRefresh,
         header = { SeasonPicker(pick, onPick, thisYear) },
     )
 }

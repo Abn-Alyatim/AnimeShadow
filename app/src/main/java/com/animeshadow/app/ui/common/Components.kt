@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -273,7 +274,7 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, action: String? 
 }
 
 @Composable
-fun StatusBanner(text: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
+fun StatusBanner(text: String, modifier: Modifier = Modifier) {
     Surface(
         modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         color = Palette.Card,
@@ -283,23 +284,20 @@ fun StatusBanner(text: String, modifier: Modifier = Modifier, onRetry: (() -> Un
         Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.CloudOff, null, tint = Palette.TextSecondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
+            // Golden rule: no retry button. Pull down to refresh instead (the hint says so).
             Text(text, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, modifier = Modifier.weight(1f))
-            if (onRetry != null) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry), color = Palette.Accent) }
         }
     }
 }
 
 @Composable
 fun EmptyState(text: String, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = Palette.TextSecondary, textAlign = TextAlign.Center)
+    // v1.2: scrollable, so a pull on an empty list refreshes it.
+    ScrollableCenter(modifier.testTag("empty_state")) {
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = Palette.TextSecondary, textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp))
     }
 }
 
-@Composable
-fun LoadingBox(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-}
 
 @Composable
 fun SelectChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {

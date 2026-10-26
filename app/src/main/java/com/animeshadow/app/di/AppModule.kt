@@ -117,5 +117,12 @@ object AppModule {
     fun backupManager(db: AppDatabase) = BackupManager(db)
 
     @Provides @Singleton
+    fun aniListAuth(@ApplicationContext context: Context, api: AniListApi, clock: Clock) =
+        com.animeshadow.app.data.auth.AniListAuthRepository(
+            context.getSharedPreferences(com.animeshadow.app.data.auth.AniListAuthRepository.PREFS, Context.MODE_PRIVATE),
+            api, clock, com.animeshadow.app.BuildConfig.ANILIST_CLIENT_ID,
+        )
+
+    @Provides @Singleton
     fun settingsRepository(@ApplicationContext context: Context) = SettingsRepository(context.dataStore)
 }

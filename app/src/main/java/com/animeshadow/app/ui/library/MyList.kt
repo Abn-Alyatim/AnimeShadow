@@ -62,6 +62,8 @@ import com.animeshadow.app.ui.browse.FilterGroup
 import com.animeshadow.app.ui.common.AnimeGrid
 import com.animeshadow.app.ui.common.AppTopBar
 import com.animeshadow.app.ui.common.EmptyState
+import com.animeshadow.app.ui.common.Refreshable
+import com.animeshadow.app.ui.ads.ListAdBanner
 import com.animeshadow.app.ui.common.SelectChip
 import com.animeshadow.app.ui.common.formatRes
 import com.animeshadow.app.ui.common.label
@@ -95,7 +97,24 @@ data class MyListUi(
 class MyListViewModel @Inject constructor(
     private val library: LibraryRepository,
     private val settings: SettingsRepository,
+    private val anime: com.animeshadow.app.data.AnimeRepository,
 ) : ViewModel() {
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing
+
+    /** v1.2 pull: re-read every title in your list from AniList (new episodes, status, score, cover) in batches of 50. */
+    fun refresh() {
+        if (_refreshing.value) return
+        viewModelScope.launch {
+            _refreshing.value = true
+            try {
+                val ids = library.observeLibrary().first().map { it.entry.animeId }
+                if (ids.isNotEmpty()) anime.refreshCards(ids)
+            } finally {
+                _refreshing.value = false
+            }
+        }
+    }
     private val status = MutableStateFlow(WatchStatus.WATCHING)
     private val filter = MutableStateFlow(LibraryFilter())
 
@@ -137,6 +156,8 @@ fun MyListContent(
     onFilter: (LibraryFilter) -> Unit,
     onToggleGrid: () -> Unit,
     onOpen: (AnimeEntity) -> Unit,
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     var showSort by remember { mutableStateOf(false) }
     var showFilter by remember { mutableStateOf(false) }
@@ -152,6 +173,7 @@ fun MyListContent(
                 GridToggle(ui.grid, onToggleGrid)
             }
         },
+        bottomBar = { ListAdBanner() },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             val tabs = WatchStatus.entries
@@ -193,20 +215,24 @@ fun MyListContent(
                     })
                 }
             }
+            // v1.2 speed: computed once per list change (v1.1 searched the whole list for every visible row).
+            val animeItems = remember(ui.items) { ui.items.mapNotNull { it.anime } }
+            val entries = remember(ui.items) { ui.items.associate { it.entry.animeId to it.entry } }
+            Refreshable(refreshing, onRefresh, Modifier.weight(1f)) {
             if (ui.items.isEmpty()) {
                 EmptyState(stringResource(R.string.empty_list))
             } else {
                 AnimeGrid(
-                    items = ui.items.mapNotNull { it.anime },
+                    items = animeItems,
                     grid = ui.grid,
                     onClick = onOpen,
                     bottomBadge = { null },
                     cornerBadge = { a -> a.seasonYear?.toString() },
                     listAccent = { a ->
-                        val e = ui.items.firstOrNull { it.entry.animeId == a.id }?.entry
-                        e?.let { stringResource(R.string.progress_value, it.progress, a.episodes?.toString() ?: "?") }
+                        entries[a.id]?.let { stringResource(R.string.progress_value, it.progress, a.episodes?.toString() ?: "?") }
                     },
                 )
+            }
             }
         }
     }
@@ -273,5 +299,6 @@ fun LibrarySortDialog(filter: LibraryFilter, onPick: (LibraryFilter) -> Unit, on
 @Composable
 fun MyListScreen(onMenu: () -> Unit, onOpen: (Int) -> Unit, vm: MyListViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    MyListContent(ui, onMenu, vm::selectStatus, vm::setFilter, { vm.toggleGrid() }, { onOpen(it.id) })
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    MyListContent(ui, onMenu, vm::selectStatus, vm::setFilter, { vm.toggleGrid() }, { onOpen(it.id) }, refreshing, vm::refresh)
 }

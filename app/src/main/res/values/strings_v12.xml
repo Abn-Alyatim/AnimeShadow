@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v1.2 -->
+    <string name="settings_about_header">عن التطبيق</string>
+    <string name="settings_version">الإصدار</string>
+    <string name="settings_developer">المطوّر</string>
+    <string name="developer_name">مدين اليتيم / Madyan AL-Yatim</string>
+    <string name="developer_phone" translatable="false">+967780647484</string>
+    <string name="developer_whatsapp_url" translatable="false">https://wa.me/967780647484</string>
+    <string name="cd_whatsapp">مراسلة المطوّر على واتساب</string>
+    <string name="no_app_to_open">لا يوجد تطبيق لفتح الرابط</string>
+
+    <string name="settings_account">الحساب</string>
+    <string name="anilist_login">تسجيل الدخول بحساب AniList</string>
+    <string name="anilist_login_sub">اختياري — كل مزايا التطبيق تعمل بدون حساب</string>
+    <string name="anilist_logged_in_as">متصل بحساب AniList: %1$s</string>
+    <string name="anilist_logout">تسجيل الخروج</string>
+    <string name="anilist_not_active_title">تسجيل الدخول غير مفعّل بعد</string>
+    <string name="anilist_not_active_text">تسجيل الدخول بحساب AniList لم يُفعَّل في هذه النسخة بعد، وسيُفعَّل قريباً.\n\nلا تقلق، كل شيء في التطبيق يعمل الآن بدون حساب، وقائمتك محفوظة على جهازك.</string>
+    <string name="anilist_login_failed">لم يكتمل تسجيل الدخول. حاول مرة أخرى لاحقاً.</string>
+    <string name="anilist_login_done">تم تسجيل الدخول بحساب AniList</string>
+    <string name="ad_label">إعلان</string>
+</resources>

@@ -52,6 +52,8 @@ import com.animeshadow.app.ui.common.AnimeListRow
 import com.animeshadow.app.ui.common.AppTopBar
 import com.animeshadow.app.ui.common.EmptyState
 import com.animeshadow.app.ui.common.LoadingBox
+import com.animeshadow.app.ui.common.Refreshable
+import com.animeshadow.app.ui.ads.ListAdBanner
 import com.animeshadow.app.ui.common.Poster
 import com.animeshadow.app.ui.common.StatusBanner
 import com.animeshadow.app.ui.common.compactCount
@@ -101,13 +103,39 @@ class CollectionsViewModel @Inject constructor(
     val popular: StateFlow<Pair<List<CharacterEntity>, Refresh?>> = combine(anime.observePopularCharacters(), popularState) { a, b -> a to b }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<CharacterEntity>() to null)
 
-    fun loadPopular(force: Boolean = false) = viewModelScope.launch { popularState.value = anime.refreshPopularCharacters(force) }
+    private val _popularRefreshing = MutableStateFlow(false)
+    val popularRefreshing: StateFlow<Boolean> = _popularRefreshing
+
+    fun loadPopular(force: Boolean = false) = viewModelScope.launch {
+        if (force) _popularRefreshing.value = true
+        try {
+            popularState.value = anime.refreshPopularCharacters(force)
+        } finally {
+            if (force) _popularRefreshing.value = false
+        }
+    }
+
+    private val _libraryRefreshing = MutableStateFlow(false)
+    /** v1.2: pull on Favorites / History re-reads those titles' cards (episodes, status, score, cover) from AniList. */
+    val libraryRefreshing: StateFlow<Boolean> = _libraryRefreshing
+
+    fun refreshCards(ids: List<Int>) {
+        if (_libraryRefreshing.value) return
+        viewModelScope.launch {
+            _libraryRefreshing.value = true
+            try {
+                if (ids.isNotEmpty()) anime.refreshCards(ids)
+            } finally {
+                _libraryRefreshing.value = false
+            }
+        }
+    }
 }
 
 @Composable
-fun FavoriteAnimeContent(items: List<AnimeEntity>?, onMenu: () -> Unit, onOpen: (AnimeEntity) -> Unit) {
-    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_fav_anime), onMenu = onMenu) }) { pad ->
-        Box(Modifier.padding(pad)) {
+fun FavoriteAnimeContent(items: List<AnimeEntity>?, onMenu: () -> Unit, onOpen: (AnimeEntity) -> Unit, refreshing: Boolean = false, onRefresh: () -> Unit = {}) {
+    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_fav_anime), onMenu = onMenu) }, bottomBar = { ListAdBanner() }) { pad ->
+        Refreshable(refreshing, onRefresh, Modifier.padding(pad)) {
             when {
                 items == null -> LoadingBox()
                 items.isEmpty() -> EmptyState(stringResource(R.string.empty_favorites))
@@ -119,7 +147,7 @@ fun FavoriteAnimeContent(items: List<AnimeEntity>?, onMenu: () -> Unit, onOpen: 
 
 @Composable
 fun FavoriteCharactersContent(items: List<FavoriteCharacterEntity>?, onMenu: () -> Unit, onOpen: (Int) -> Unit) {
-    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_fav_characters), onMenu = onMenu) }) { pad ->
+    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_fav_characters), onMenu = onMenu) }, bottomBar = { ListAdBanner() }) { pad ->
         Box(Modifier.padding(pad)) {
             when {
                 items == null -> LoadingBox()
@@ -136,11 +164,11 @@ fun FavoriteCharactersContent(items: List<FavoriteCharacterEntity>?, onMenu: () 
 }
 
 @Composable
-fun PopularCharactersContent(items: List<CharacterEntity>, state: Refresh?, onMenu: () -> Unit, onRetry: () -> Unit, onOpen: (Int) -> Unit) {
-    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_popular_characters), onMenu = onMenu) }) { pad ->
+fun PopularCharactersContent(items: List<CharacterEntity>, state: Refresh?, onMenu: () -> Unit, onRefresh: () -> Unit, onOpen: (Int) -> Unit, refreshing: Boolean = false) {
+    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_popular_characters), onMenu = onMenu) }, bottomBar = { ListAdBanner() }) { pad ->
         Column(Modifier.padding(pad)) {
-            (state as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.empty_feed), onRetry = onRetry) }
-            when {
+            (state as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.load_failed)) }
+            Refreshable(refreshing && items.isNotEmpty(), onRefresh, Modifier.weight(1f)) { when {
                 items.isEmpty() && state == null -> LoadingBox()
                 items.isEmpty() -> EmptyState(stringResource(R.string.empty_feed))
                 else -> LazyVerticalGrid(
@@ -151,16 +179,16 @@ fun PopularCharactersContent(items: List<CharacterEntity>, state: Refresh?, onMe
                         CharacterCard(c.name, c.image, c.favourites?.let { stringResource(R.string.favourites_count, compactCount(it)) }, { onOpen(c.id) })
                     }
                 }
-            }
+            } }
         }
     }
 }
 
 @Composable
-fun HistoryContent(items: List<HistoryRow>?, onMenu: () -> Unit, onOpen: (Int) -> Unit) {
+fun HistoryContent(items: List<HistoryRow>?, onMenu: () -> Unit, onOpen: (Int) -> Unit, refreshing: Boolean = false, onRefresh: () -> Unit = {}) {
     val fmt = com.animeshadow.app.ui.common.latinDateTimeFormat()
-    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_history), onMenu = onMenu) }) { pad ->
-        Box(Modifier.padding(pad)) {
+    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_history), onMenu = onMenu) }, bottomBar = { ListAdBanner() }) { pad ->
+        Refreshable(refreshing, onRefresh, Modifier.padding(pad)) {
             when {
                 items == null -> LoadingBox()
                 items.isEmpty() -> EmptyState(stringResource(R.string.empty_history))
@@ -180,7 +208,8 @@ fun HistoryContent(items: List<HistoryRow>?, onMenu: () -> Unit, onOpen: (Int) -
 @Composable
 fun FavoriteAnimeScreen(onMenu: () -> Unit, onOpen: (Int) -> Unit, vm: CollectionsViewModel = hiltViewModel()) {
     val items by vm.favoriteAnime.collectAsStateWithLifecycle()
-    FavoriteAnimeContent(items, onMenu) { onOpen(it.id) }
+    val refreshing by vm.libraryRefreshing.collectAsStateWithLifecycle()
+    FavoriteAnimeContent(items, onMenu, { onOpen(it.id) }, refreshing) { vm.refreshCards(items.orEmpty().map { it.id }) }
 }
 
 @Composable
@@ -192,12 +221,14 @@ fun FavoriteCharactersScreen(onMenu: () -> Unit, onOpen: (Int) -> Unit, vm: Coll
 @Composable
 fun HistoryScreen(onMenu: () -> Unit, onOpen: (Int) -> Unit, vm: CollectionsViewModel = hiltViewModel()) {
     val items by vm.history.collectAsStateWithLifecycle()
-    HistoryContent(items, onMenu, onOpen)
+    val refreshing by vm.libraryRefreshing.collectAsStateWithLifecycle()
+    HistoryContent(items, onMenu, onOpen, refreshing) { vm.refreshCards(items.orEmpty().map { it.anime.id }) }
 }
 
 @Composable
 fun PopularCharactersScreen(onMenu: () -> Unit, onOpen: (Int) -> Unit, vm: CollectionsViewModel = hiltViewModel()) {
     androidx.compose.runtime.LaunchedEffect(Unit) { vm.loadPopular() }
     val state by vm.popular.collectAsStateWithLifecycle()
-    PopularCharactersContent(state.first, state.second, onMenu, { vm.loadPopular(true) }, onOpen)
+    val refreshing by vm.popularRefreshing.collectAsStateWithLifecycle()
+    PopularCharactersContent(state.first, state.second, onMenu, { vm.loadPopular(true) }, onOpen, refreshing)
 }

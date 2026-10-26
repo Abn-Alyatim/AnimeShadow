@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -158,10 +161,38 @@ val DrawerEntries = listOf(
 class RootViewModel @Inject constructor(
     settings: SettingsRepository,
     notifications: NotificationRepository,
+    anime: com.animeshadow.app.data.AnimeRepository,
     @ApplicationContext context: Context,
 ) : ViewModel() {
     val profile: StateFlow<Profile> = settings.settings.map { it.profile }.stateIn(viewModelScope, SharingStarted.Eagerly, Profile())
     val unread: StateFlow<Int> = notifications.observeUnreadCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /**
+     * v1.2 loading animation: the Shadow loop shows on black at start-up and keeps looping while the first screen's
+     * titles are not there yet (first run / weak network), then fades into the app. With titles already cached it
+     * leaves after [SPLASH_MIN_MS]; it never holds the app longer than [SPLASH_MAX_MS] (offline first run → the empty
+     * screen, which a pull refreshes). Lives in the ViewModel, so a rotation does not replay it.
+     */
+    private val _splashDone = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val splashDone: StateFlow<Boolean> = _splashDone
+
+    init {
+        if (!SplashConfig.enabled) _splashDone.value = true
+        else viewModelScope.launch {
+            val start = System.currentTimeMillis()
+            kotlinx.coroutines.withTimeoutOrNull(SPLASH_MAX_MS) {
+                anime.observeFeed(com.animeshadow.app.data.AnimeRepository.FEED_AIRING).first { it.isNotEmpty() }
+            }
+            val left = SPLASH_MIN_MS - (System.currentTimeMillis() - start)
+            if (left > 0) kotlinx.coroutines.delay(left)
+            _splashDone.value = true
+        }
+    }
+
+    companion object {
+        const val SPLASH_MIN_MS = 1_200L
+        const val SPLASH_MAX_MS = 9_000L
+    }
 
     init {
         viewModelScope.launch {
@@ -234,6 +265,10 @@ fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, vm: RootViewMod
     }
 
     val openMenu: () -> Unit = { scope.launch { drawer.open() } }
+    // v1.2 bug fix: Back with the drawer open closed the screen (or left the app) instead of closing the drawer.
+    androidx.activity.compose.BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
+    val splashDone by vm.splashDone.collectAsStateWithLifecycle()
+    Box(Modifier.fillMaxSize()) {
     ModalNavigationDrawer(
         drawerState = drawer,
         gesturesEnabled = topLevel,
@@ -249,6 +284,32 @@ fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, vm: RootViewMod
         },
     ) {
         AppNavHost(nav, openMenu, drawer)
+    }
+    ShadowSplash(visible = !splashDone)
+    }
+}
+
+/** Robolectric app tests switch the start-up animation off (their clock does not run on its own). */
+object SplashConfig {
+    @Volatile var enabled: Boolean = true
+}
+
+/** Full-screen black with the small Shadow loop; fades out into the UI. */
+@Composable
+fun ShadowSplash(visible: Boolean) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.EnterTransition.None,
+        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(durationMillis = 450)),
+    ) {
+        Box(
+            Modifier.fillMaxSize().background(Palette.Black)
+                .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
+                .testTag("shadow_splash"),
+            contentAlignment = Alignment.Center,
+        ) {
+            com.animeshadow.app.ui.common.ShadowLoop(Modifier.width(240.dp))
+        }
     }
 }
 

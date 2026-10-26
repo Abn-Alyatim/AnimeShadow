@@ -52,6 +52,8 @@ import com.animeshadow.app.ui.common.AnimeGridCard
 import com.animeshadow.app.ui.common.AppTopBar
 import com.animeshadow.app.ui.common.EmptyState
 import com.animeshadow.app.ui.common.LoadingBox
+import com.animeshadow.app.ui.common.Refreshable
+import com.animeshadow.app.ui.ads.ListAdBanner
 import com.animeshadow.app.ui.common.Poster
 import com.animeshadow.app.ui.common.SectionHeader
 import com.animeshadow.app.ui.common.StatusBanner
@@ -80,16 +82,36 @@ class RecommendationsViewModel @Inject constructor(
     library: LibraryRepository,
     private val anime: AnimeRepository,
 ) : ViewModel() {
-    val ui: StateFlow<List<Recommendation>?> = library.observeLibrary().map { items ->
+    private val tick = MutableStateFlow(0)
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing
+    private var lastIds: List<Int> = emptyList()
+
+    val ui: StateFlow<List<Recommendation>?> = combine(library.observeLibrary(), tick) { items, _ ->
+        lastIds = items.map { it.entry.animeId }
         val liked = items.filter { RecommendationEngine.entryWeight(it) >= 0.8 }.map { it.entry.animeId }
         RecommendationEngine.recommend(items, anime.cachedCandidates(), anime.recommendationsFor(liked))
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** v1.2 pull: refresh your list's cards from AniList, then recompute (new cached titles become candidates). */
+    fun refresh() {
+        if (_refreshing.value) return
+        viewModelScope.launch {
+            _refreshing.value = true
+            try {
+                if (lastIds.isNotEmpty()) anime.refreshCards(lastIds)
+                tick.value++
+            } finally {
+                _refreshing.value = false
+            }
+        }
+    }
 }
 
 @Composable
-fun RecommendationsContent(items: List<Recommendation>?, onMenu: () -> Unit, onOpen: (Int) -> Unit) {
-    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_recommendations), onMenu = onMenu) }) { pad ->
-        Box(Modifier.padding(pad)) {
+fun RecommendationsContent(items: List<Recommendation>?, onMenu: () -> Unit, onOpen: (Int) -> Unit, refreshing: Boolean = false, onRefresh: () -> Unit = {}) {
+    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_recommendations), onMenu = onMenu) }, bottomBar = { ListAdBanner() }) { pad ->
+        Refreshable(refreshing, onRefresh, Modifier.padding(pad)) {
             when {
                 items == null -> LoadingBox()
                 items.isEmpty() -> EmptyState(stringResource(R.string.empty_recommendations))
@@ -132,39 +154,68 @@ private fun PairSide(label: String, anime: AnimeEntity?, modifier: Modifier, onO
 @Composable
 fun RecommendationsScreen(onMenu: () -> Unit, onOpen: (Int) -> Unit, vm: RecommendationsViewModel = hiltViewModel()) {
     val items by vm.ui.collectAsStateWithLifecycle()
-    RecommendationsContent(items, onMenu, onOpen)
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    RecommendationsContent(items, onMenu, onOpen, refreshing, vm::refresh)
 }
 
 // ------------------------------------------------------------------ Weekly schedule
 
-data class ScheduleUi(val days: Map<DayOfWeek, List<ScheduleRow>> = emptyMap(), val refresh: Refresh? = null, val today: DayOfWeek = DayOfWeek.SATURDAY)
+data class ScheduleUi(
+    val days: Map<DayOfWeek, List<ScheduleRow>> = emptyMap(),
+    val refresh: Refresh? = null,
+    val today: DayOfWeek = DayOfWeek.SATURDAY,
+    val refreshing: Boolean = false,
+)
 
 @HiltViewModel
 class ScheduleViewModel @Inject constructor(private val repo: AnimeRepository) : ViewModel() {
     private val refresh = MutableStateFlow<Refresh?>(null)
+    private val refreshing = MutableStateFlow(false)
     private val zone = ZoneId.systemDefault()
     private val now = System.currentTimeMillis()
 
-    val ui: StateFlow<ScheduleUi> = combine(repo.observeSchedule(now - 24 * 3_600_000L, now + 7 * 24 * 3_600_000L), refresh) { rows, r ->
-        ScheduleUi(WeekSchedule.group(rows.filter { it.airAt >= startOfToday() }, zone), r, WeekSchedule.dayOf(now, zone))
+    val ui: StateFlow<ScheduleUi> = combine(repo.observeSchedule(now - 24 * 3_600_000L, now + 7 * 24 * 3_600_000L), refresh, refreshing) { rows, r, busy ->
+        ScheduleUi(WeekSchedule.group(rows.filter { it.airAt >= startOfToday() }, zone), r, WeekSchedule.dayOf(now, zone), busy)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScheduleUi())
 
     private fun startOfToday(): Long = java.time.LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
 
     init { load(false) }
 
-    fun load(force: Boolean) = viewModelScope.launch { refresh.value = repo.refreshSchedule(force) }
+    private var job: kotlinx.coroutines.Job? = null
+
+    fun load(force: Boolean) {
+        if (job?.isActive == true && !force) return
+        job?.cancel()
+        job = viewModelScope.launch {
+            if (force) refreshing.value = true
+            try {
+                refresh.value = repo.refreshSchedule(force)
+            } finally {
+                if (force) refreshing.value = false
+            }
+        }
+    }
 }
 
 @Composable
-fun ScheduleContent(ui: ScheduleUi, onMenu: () -> Unit, onOpen: (Int) -> Unit, onRetry: () -> Unit) {
+fun ScheduleContent(ui: ScheduleUi, onMenu: () -> Unit, onOpen: (Int) -> Unit, onRefresh: () -> Unit) {
     val time = com.animeshadow.app.ui.common.latinTimeFormat()
-    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_schedule), onMenu = onMenu) }) { pad ->
+    Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_schedule), onMenu = onMenu) }, bottomBar = { ListAdBanner() }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            (ui.refresh as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.empty_feed), onRetry = onRetry) }
+            (ui.refresh as? Refresh.Failed)?.let { StatusBanner(stringResource(if (it.offline) R.string.offline_cached else R.string.load_failed)) }
+            Refreshable(ui.refreshing, onRefresh, Modifier.weight(1f)) { ScheduleGrid(ui, time, onOpen) }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleGrid(ui: ScheduleUi, time: java.text.DateFormat, onOpen: (Int) -> Unit) {
+    run {
+        run {
             if (ui.days.values.all { it.isEmpty() }) {
                 if (ui.refresh == null) LoadingBox() else EmptyState(stringResource(R.string.empty_feed))
-                return@Column
+                return
             }
             // Today first, then the rest of the week in Saturday-first order.
             val order = WeekSchedule.ORDER.let { o -> val i = o.indexOf(ui.today); o.drop(i) + o.take(i) }

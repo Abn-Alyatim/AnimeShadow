@@ -222,3 +222,16 @@ data class StaffDto(
     val primaryOccupations: List<String> = emptyList(),
     val characterMedia: StaffCharacterMediaConnDto? = null,
 )
+
+// ---------- v1.2: AniList login ----------
+@Serializable
+data class ViewerResponse(val data: ViewerData? = null, val errors: List<GqlError>? = null)
+
+@Serializable
+data class ViewerData(@SerialName("Viewer") val viewer: ViewerDto? = null)
+
+@Serializable
+data class ViewerDto(val id: Int, val name: String, val avatar: ViewerAvatar? = null)
+
+@Serializable
+data class ViewerAvatar(val large: String? = null, val medium: String? = null)

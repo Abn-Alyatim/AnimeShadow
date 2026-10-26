@@ -53,21 +53,38 @@ abstract class PagedFeedViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FeedUi())
 
     private var job: Job? = null
+    private var jobForced = false
+    private var generation = 0
 
+    /**
+     * [force] = a pull-to-refresh: always goes to the network (ignores the cache TTL). v1.1 bug: a pull that came
+     * while the automatic (TTL-checked) load was still running was dropped; now the pull replaces it.
+     */
     fun refresh(force: Boolean = false) {
-        if (job?.isActive == true) return
+        if (job?.isActive == true) {
+            if (!force || jobForced) return
+            job?.cancel()
+        }
+        jobForced = force
+        val gen = ++generation
         job = viewModelScope.launch {
             refreshing.value = true
-            val r = refreshCall(force)
-            error.value = r as? Refresh.Failed
-            refreshing.value = false
-            loaded.value = true
+            try {
+                val r = refreshCall(force)
+                error.value = r as? Refresh.Failed
+                loaded.value = true
+            } finally {
+                // A cancelled older run must not switch off the indicator of the run that replaced it.
+                if (gen == generation) refreshing.value = false
+            }
         }
     }
 
     /** Switches to another feed: cancels the running refresh of the previous one. */
     protected fun restart() {
+        generation++
         job?.cancel()
+        moreJob?.cancel()
         refreshing.value = false
         loadingMore.value = false
         error.value = null
@@ -75,13 +92,18 @@ abstract class PagedFeedViewModel(
         refresh()
     }
 
+    private var moreJob: Job? = null
+
     fun loadMore() {
         if (loadingMore.value || refreshing.value || error.value != null) return
-        viewModelScope.launch {
+        moreJob = viewModelScope.launch {
             loadingMore.value = true
-            val r = loadMoreCall()
-            if (r is Refresh.Failed) error.value = r
-            loadingMore.value = false
+            try {
+                val r = loadMoreCall()
+                if (r is Refresh.Failed) error.value = r
+            } finally {
+                loadingMore.value = false
+            }
         }
     }
 
