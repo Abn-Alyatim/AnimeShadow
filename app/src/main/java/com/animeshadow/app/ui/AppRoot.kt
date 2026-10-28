@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Recommend
 import androidx.compose.material.icons.filled.Schedule
@@ -54,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -309,7 +310,8 @@ fun DrawerContent(
                 // v1.0 bug: the bell opened the schedule. It opens the Notifications history now.
                 IconButton(onClick = { onSelect(Routes.NOTIFICATIONS) }, modifier = Modifier.testTag("drawer_bell")) {
                     BadgedBox(badge = { if (unread > 0) Badge { Text(if (unread > 99) "99+" else unread.toString()) } }) {
-                        Icon(Icons.Filled.Notifications, stringResource(R.string.cd_notifications), tint = Palette.Accent)
+                        // v1.3.1 (Madyan): a thin WHITE outline bell — no fill, no colour, same 24 dp as the other icons.
+                        Icon(Icons.Outlined.Notifications, stringResource(R.string.cd_notifications), tint = Color.White, modifier = Modifier.testTag("drawer_bell_icon"))
                     }
                 }
             }
@@ -325,7 +327,7 @@ fun DrawerContent(
                         selectedIconColor = Palette.Accent,
                         selectedTextColor = Palette.Text,
                         unselectedContainerColor = Palette.Black,
-                        unselectedIconColor = Palette.TextSecondary,
+                        unselectedIconColor = Palette.RefIcon,
                         unselectedTextColor = Palette.Text,
                     ),
                     modifier = Modifier.padding(horizontal = 10.dp),
@@ -428,8 +430,8 @@ fun ShadowSplash(visible: Boolean) {
 }
 
 /** Screens that exist in both modes (account, settings, notifications). */
-fun androidx.navigation.NavGraphBuilder.sharedScreens(nav: NavHostController, openMenu: () -> Unit, openAnime: (Int) -> Unit) {
-    composable(Routes.STATS) { ProfileScreen(openMenu, onEdit = { nav.navigate(Routes.EDIT_PROFILE) }, onLogin = { nav.navigate(Routes.LOGIN) }) }
+fun androidx.navigation.NavGraphBuilder.sharedScreens(nav: NavHostController, openMenu: () -> Unit, manga: Boolean = false, openAnime: (Int) -> Unit) {
+    composable(Routes.STATS) { ProfileScreen(openMenu, onEdit = { nav.navigate(Routes.EDIT_PROFILE) }, onLogin = { nav.navigate(Routes.LOGIN) }, manga = manga) }
     composable(Routes.EDIT_PROFILE) { EditProfileScreen({ nav.popBackStack() }) }
     composable(Routes.LOGIN) { LoginScreen({ nav.popBackStack() }) }
     composable(Routes.SETTINGS) { SettingsScreen(openMenu) }
@@ -455,7 +457,7 @@ private fun AppNavHost(nav: NavHostController, openMenu: () -> Unit, @Suppress("
         composable(Routes.POPULAR_CHARACTERS) { PopularCharactersScreen(openMenu, openCharacter) }
         composable(Routes.RECOMMENDATIONS) { RecommendationsScreen(openMenu, open) }
         composable(Routes.SCHEDULE) { ScheduleScreen(openMenu, open) }
-        sharedScreens(nav, openMenu, open)
+        sharedScreens(nav, openMenu, openAnime = open)
         composable(Routes.GENRE, arguments = listOf(navArgument("name") { type = NavType.StringType })) {
             GenreScreen({ nav.popBackStack() }, open)
         }

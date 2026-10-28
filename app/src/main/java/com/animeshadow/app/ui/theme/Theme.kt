@@ -37,9 +37,10 @@ object Palette {
     val Favorite = Color(0xFFFF4D8D)
     /** Blue of the reference app (watched eye, sliders, "cancel"), sampled from refs 03 and 13. */
     val Blue = Color(0xFF0091EA)
-    /** Light grey of the reference titles / icons (ref 11). */
+    /** Light grey of the reference titles (ref 11). */
     val RefText = Color(0xFFE0E0E0)
-    val RefIcon = Color(0xFFBDBDBD)
+    /** v1.3.1 (Madyan): EVERY icon is bright white #FFFFFF at full alpha, like his reference drawer (1.3.0: grey #BDBDBD). */
+    val RefIcon = Color(0xFFFFFFFF)
     val Chip = Color(0xFF262626)
 }
 

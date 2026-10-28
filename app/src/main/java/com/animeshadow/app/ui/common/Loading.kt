@@ -51,11 +51,14 @@ import kotlinx.coroutines.withContext
 val LocalAnimatedLoader = staticCompositionLocalOf { true }
 
 /**
- * Madyan's 3.4 s Shadow loop (res/raw/shadow_loop.webp: 640×360 animated WebP, 103 frames at 30 fps, ~490 KB,
- * re-encoded from his shadow_loop3.mp4 at 37–44 dB PSNR; the clip's edges are feathered into pure #000 so no box shows
- * on the black screen). An animated WebP loops with no gap or black flash (a video player seeks back to 0, which
- * can stutter), and Android animates it on the render thread, so it stays smooth even while the main thread is busy.
- * Android 8.0/8.1 (no AnimatedImageDrawable) show the still frame.
+ * The Shadow loader (res/raw/shadow_loop.webp: 528×360 animated WebP, 110 frames at 30 fps, a seamless 3.7 s loop).
+ * v1.3.1: it is cut from the SAME clip as the splash/login video (Madyan's 1.3 video), with the same pure-black,
+ * feathered edges — 1.3.0 still played the old v1.2 clip here, which is the «old video» seen when switching to Manga
+ * (Manga's first screen loads from the network, so the loader is the first thing it shows).
+ * The still frame (shadow_still = the loop's first frame) is ALWAYS drawn underneath, so the loader can never be an
+ * empty black box: not while the WebP decodes, not if decoding fails, not on Android 8.0/8.1 (no
+ * AnimatedImageDrawable). The animation is (re)started on the main thread each time its view is attached.
+ * An animated WebP loops with no gap or black flash, and Android animates it on the render thread.
  */
 @Composable
 fun ShadowLoop(modifier: Modifier = Modifier) {
@@ -66,17 +69,30 @@ fun ShadowLoop(modifier: Modifier = Modifier) {
         LaunchedEffect(Unit) { drawable = decodeLoop(ctx) }
         DisposableEffect(Unit) { onDispose { (drawable as? AnimatedImageDrawable)?.stop(); drawable = null } }
     }
-    Box(modifier.aspectRatio(16f / 9f).background(Palette.Black).testTag("shadow_loop")) {
+    Box(modifier.aspectRatio(SHADOW_CLIP_ASPECT).background(Palette.Black).testTag("shadow_loop")) {
+        Image(painterResource(R.drawable.shadow_still), null, Modifier.fillMaxSize().testTag("shadow_still"), contentScale = ContentScale.Fit)
         val d = drawable
-        when {
-            d != null -> AndroidView(
-                factory = { c -> ImageView(c).apply { scaleType = ImageView.ScaleType.FIT_CENTER } },
-                modifier = Modifier.fillMaxSize(),
-                update = { v -> if (v.drawable !== d) v.setImageDrawable(d) },
-            )
-            // Decoding takes a few ms; black (the clip's own background) until then, so there is no jump.
-            !animated -> Image(painterResource(R.drawable.shadow_still), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-        }
+        if (d != null) AndroidView(
+            factory = { c ->
+                ImageView(c).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                    addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
+                        override fun onViewAttachedToWindow(v: android.view.View) { startLoop((v as ImageView).drawable) }
+                        override fun onViewDetachedFromWindow(v: android.view.View) = Unit
+                    })
+                }
+            },
+            modifier = Modifier.fillMaxSize().testTag("shadow_loop_anim"),
+            update = { v -> if (v.drawable !== d) v.setImageDrawable(d); startLoop(d) },
+        )
+    }
+}
+
+private fun startLoop(d: Drawable?) {
+    if (Build.VERSION.SDK_INT >= 28 && d is AnimatedImageDrawable && !d.isRunning) {
+        d.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+        d.start()
     }
 }
 
@@ -87,10 +103,7 @@ private suspend fun decodeLoop(ctx: Context): Drawable? =
 private suspend fun decodeLoop28(ctx: Context): Drawable? = withContext(Dispatchers.IO) {
     runCatching {
         ImageDecoder.decodeDrawable(ImageDecoder.createSource(ctx.resources, R.raw.shadow_loop)).also { d ->
-            if (d is AnimatedImageDrawable) {
-                d.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
-                d.start()
-            }
+            if (d is AnimatedImageDrawable) d.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
         }
     }.getOrNull()
 }

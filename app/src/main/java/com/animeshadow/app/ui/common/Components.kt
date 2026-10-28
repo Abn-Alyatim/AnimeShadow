@@ -259,7 +259,7 @@ fun AppTopBar(
             }
         },
         actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Black, scrolledContainerColor = Palette.Black),
+        colors = TopAppBarDefaults.topAppBarColors(navigationIconContentColor = Palette.RefIcon, actionIconContentColor = Palette.RefIcon, containerColor = Palette.Black, scrolledContainerColor = Palette.Black),
     )
 }
 
@@ -282,7 +282,7 @@ fun StatusBanner(text: String, modifier: Modifier = Modifier) {
         border = BorderStroke(1.dp, Palette.Divider),
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.CloudOff, null, tint = Palette.TextSecondary, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.CloudOff, null, tint = Palette.RefIcon, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             // Golden rule: no retry button. Pull down to refresh instead (the hint says so).
             Text(text, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, modifier = Modifier.weight(1f))

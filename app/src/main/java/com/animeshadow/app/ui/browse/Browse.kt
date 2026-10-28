@@ -226,7 +226,7 @@ fun BrowseContent(
                     }
                     if (onBack == null) GridToggle(ui.grid, onToggleGrid)
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Black),
+                colors = TopAppBarDefaults.topAppBarColors(navigationIconContentColor = Palette.RefIcon, actionIconContentColor = Palette.RefIcon, containerColor = Palette.Black),
             )
         },
         bottomBar = { ListAdBanner() },

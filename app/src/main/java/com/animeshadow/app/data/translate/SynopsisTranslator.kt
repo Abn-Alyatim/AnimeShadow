@@ -90,6 +90,11 @@ class MyMemoryTranslator(
     private val client: OkHttpClient,
     private val email: String = "",
     private val baseUrl: String = "https://api.mymemory.translated.net/",
+    /**
+     * v1.3.1: second free service used when MyMemory refuses (daily quota used up by the background anime
+     * translations, or an error) — the reason the manga synopsis stayed English. Null = MyMemory only (tests).
+     */
+    private val fallbackUrl: String? = null,
 ) : SynopsisTranslator {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -123,8 +128,27 @@ class MyMemoryTranslator(
 
     private fun translateChunks(text: String): String? {
         val parts = mutableListOf<String>()
-        for (c in chunks(text)) parts += request(c) ?: return null
+        for (c in chunks(text)) parts += requestWithFallback(c) ?: return null
         return parts.joinToString(" ")
+    }
+
+    private fun requestWithFallback(q: String): String? {
+        val primary = try { request(q) } catch (e: TranslationQuotaException) { if (fallbackUrl == null) throw e; null }
+        return primary ?: fallbackUrl?.let { runCatching { fallback(it, q) }.getOrNull() }
+    }
+
+    /** translate.googleapis.com "gtx" endpoint: [[["ترجمة","source",…],…],…]. */
+    private fun fallback(base: String, q: String): String? {
+        val url = base.toHttpUrl().newBuilder().addPathSegments("translate_a/single")
+            .addQueryParameter("client", "gtx").addQueryParameter("sl", "en").addQueryParameter("tl", "ar")
+            .addQueryParameter("dt", "t").addQueryParameter("q", q).build()
+        client.newCall(Request.Builder().url(url).get().build()).execute().use { r ->
+            if (!r.isSuccessful) return null
+            val root = json.parseToJsonElement(r.body?.string().orEmpty())
+            val segs = (root as? kotlinx.serialization.json.JsonArray)?.getOrNull(0) as? kotlinx.serialization.json.JsonArray ?: return null
+            val text = segs.joinToString("") { s -> ((s as? kotlinx.serialization.json.JsonArray)?.getOrNull(0) as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty() }
+            return text.takeIf { it.isNotBlank() }
+        }
     }
 
     private fun request(q: String): String? {
@@ -148,6 +172,7 @@ class MyMemoryTranslator(
 
     companion object {
         const val TITLE_PREFIX = "title:"
+        const val FALLBACK_URL = "https://translate.googleapis.com/"
         private val STYLES: List<(Int) -> String> = listOf({ n -> "{{${7700 + n}}}" }, { n -> "Xa${7700 + n}" })
         private const val MAX = 480
 

@@ -131,6 +131,7 @@ import com.animeshadow.app.data.StatusBucket
 import com.animeshadow.app.data.local.AnimeCharacterEntity
 import com.animeshadow.app.data.local.AnimeEntity
 import com.animeshadow.app.data.local.WatchStatus
+import com.animeshadow.app.data.local.prettyTitle
 import com.animeshadow.app.domain.ContentRating
 import com.animeshadow.app.domain.WeekSchedule
 import com.animeshadow.app.ui.collections.CharacterCard
@@ -303,7 +304,7 @@ fun DetailsContent(ui: DetailsUi, actions: DetailsActions, initialTab: Int = 0) 
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Black),
+                colors = TopAppBarDefaults.topAppBarColors(navigationIconContentColor = Palette.RefIcon, actionIconContentColor = Palette.RefIcon, containerColor = Palette.Black),
             )
         },
     ) { pad ->
@@ -448,13 +449,15 @@ private fun Header(a: AnimeEntity, onPoster: () -> Unit) {
         )
         Spacer(Modifier.width(15.dp))
         Column(Modifier.weight(1f).padding(bottom = 14.dp)) {
-            val title = a.englishTitle ?: a.displayTitle
+            // v1.3.1 (Madyan): English title on top, the Japanese (romaji) one under it; shown once when they are the same.
+            val (title, second) = com.animeshadow.app.ui.common.titlePair(a.titleEnglish?.let(::prettyTitle), a.titleRomaji?.let(::prettyTitle), a.titleNative)
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium.copy(fontSize = RefType.Title, lineHeight = 20.sp, lineHeightStyle = TightCenter),
-                color = Color.White, maxLines = 3, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Left,
+                color = Color.White, maxLines = if (second != null) 2 else 3, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Left,
                 modifier = Modifier.padding(bottom = 1.dp).combinedClickable(onClick = {}, onLongClick = { copyWithToast(context, clipboard, title) }).testTag("title"),
             )
+            if (second != null) com.animeshadow.app.ui.common.SecondTitle(second)
             val day = a.nextAiringAt?.takeIf { a.status == "RELEASING" }?.let { stringResource(dayRes(WeekSchedule.dayOf(it, ZoneId.systemDefault()))) }
             val status = label(statusRes(a.status), a.status)
             // Ref 11 reads «(الاحد) مستمر»: the day first, so «مستمر» ends up on the left.
@@ -472,10 +475,10 @@ private fun Header(a: AnimeEntity, onPoster: () -> Unit) {
     }
 }
 
-private val TightCenter = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)
+internal val TightCenter = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)
 
 @Composable
-private fun HeaderLine(text: String, modifier: Modifier = Modifier) {
+internal fun HeaderLine(text: String, modifier: Modifier = Modifier) {
     // Ref 11: 14 sp regular light grey lines, 25 dp apart.
     Box(modifier.height(24.5.dp).semantics(mergeDescendants = true) {}, contentAlignment = Alignment.CenterStart) {
         Text(
@@ -540,7 +543,7 @@ private fun RatingRow(ui: DetailsUi, a: AnimeEntity, actions: DetailsActions, on
 }
 
 @Composable
-private fun RatingCell(modifier: Modifier, icon: @Composable () -> Unit, content: @Composable () -> Unit) {
+internal fun RatingCell(modifier: Modifier, icon: @Composable () -> Unit, content: @Composable () -> Unit) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.height(26.dp), contentAlignment = Alignment.Center) { icon() }
         Spacer(Modifier.height(5.dp))
@@ -549,7 +552,7 @@ private fun RatingCell(modifier: Modifier, icon: @Composable () -> Unit, content
 }
 
 @Composable
-private fun ScoreOutOf10(value: String?) {
+internal fun ScoreOutOf10(value: String?) {
     Text(
         buildAnnotatedString {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = RefType.Score, color = Color.White)) { append(value ?: "—") }
@@ -561,7 +564,7 @@ private fun ScoreOutOf10(value: String?) {
 }
 
 @Composable
-private fun CellSub(text: String, modifier: Modifier = Modifier) {
+internal fun CellSub(text: String, modifier: Modifier = Modifier) {
     Text(
         text, style = MaterialTheme.typography.bodySmall.copy(fontSize = RefType.Small, lineHeight = 16.sp, lineHeightStyle = TightCenter),
         color = Color(0xFFCACACA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier.padding(top = 2.dp),
@@ -569,7 +572,7 @@ private fun CellSub(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun MalLogo() {
+internal fun MalLogo() {
     Box(Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0xFF2E51A2)).padding(horizontal = 4.dp, vertical = 1.dp)) {
         Text(stringResource(R.string.mal_short), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
     }
@@ -577,7 +580,7 @@ private fun MalLogo() {
 
 /** Small dark chip of ref 11 (genres, studio): 22 dp high, 4 dp corners, 11.5 sp text. */
 @Composable
-private fun RefChip(text: String, modifier: Modifier = Modifier, fontSize: TextUnit = RefType.Chip, pill: Boolean = false) {
+internal fun RefChip(text: String, modifier: Modifier = Modifier, fontSize: TextUnit = RefType.Chip, pill: Boolean = false) {
     Box(
         Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF1A1A1A)).then(modifier).height(22.dp).padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center,
@@ -690,8 +693,13 @@ fun PosterViewer(url: String?, title: String, onDismiss: () -> Unit) {
 
 /** Ref 03: four 0–10 sliders, overall X/10 under them, «حسنا» / «الغاء» at the bottom right. */
 @Composable
-fun RatingDialog(title: String, initial: RatingParts, onSave: (RatingParts) -> Unit, onDismiss: () -> Unit) {
+fun RatingDialog(title: String, initial: RatingParts, onSave: (RatingParts) -> Unit, onDismiss: () -> Unit, manga: Boolean = false) {
     var r by remember { mutableStateOf(initial) }
+    if (manga) {
+        // v1.3.1: the manga page uses this same dialog — story, characters, art (no music); overall = their average.
+        MangaRatingBody(title, r, { r = it }, onSave, onDismiss)
+        return
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF080808),
@@ -726,9 +734,44 @@ fun RatingDialog(title: String, initial: RatingParts, onSave: (RatingParts) -> U
     )
 }
 
+@Composable
+private fun MangaRatingBody(title: String, r: RatingParts, onChange: (RatingParts) -> Unit, onSave: (RatingParts) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF080808),
+        shape = RoundedCornerShape(4.dp),
+        title = {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Palette.TextSecondary, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth(), maxLines = 2)
+        },
+        text = {
+            Column(Modifier.fillMaxWidth().testTag("rating_dialog")) {
+                RatingSlider(stringResource(R.string.rate_story), r.story, "slider_story") { onChange(r.copy(story = it)) }
+                RatingSlider(stringResource(R.string.rate_characters), r.characters, "slider_characters") { onChange(r.copy(characters = it)) }
+                RatingSlider(stringResource(R.string.rate_art), r.animation, "slider_art") { onChange(r.copy(animation = it)) }
+                val o = (r.story + r.characters + r.animation) / 3.0
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)) {
+                            append(if (o % 1.0 == 0.0) o.toInt().toString() else String.format(Locale.US, "%.1f", o))
+                        }
+                        withStyle(SpanStyle(fontSize = 13.sp, color = Palette.TextSecondary)) { append("/10") }
+                    },
+                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("rating_overall"),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(r) }, modifier = Modifier.testTag("rating_ok")) { Text(stringResource(R.string.ok_ref), color = Palette.RefText, fontSize = 13.sp) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = Palette.Blue, fontSize = 13.sp) }
+        },
+    )
+}
+
 /** Ref 03 slider: a thin blue line with a dot per step (0–10), a blue thumb, the numbers under the dots. */
 @Composable
-private fun RatingSlider(label: String, value: Int, tag: String, onChange: (Int) -> Unit) {
+internal fun RatingSlider(label: String, value: Int, tag: String, onChange: (Int) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Text(label, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold), color = Palette.RefText, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
         DotSlider(value, onChange, Modifier.fillMaxWidth().height(22.dp).testTag(tag).semantics { contentDescription = "$label $value" })
@@ -805,7 +848,7 @@ private fun EpisodesTab(ui: DetailsUi, a: AnimeEntity, actions: DetailsActions, 
                     Icon(
                         Icons.Filled.Visibility,
                         stringResource(R.string.cd_mark_watched, e),
-                        tint = if (watched) Palette.Blue else Color(0xFF616161), modifier = Modifier.size(20.dp),
+                        tint = if (watched) Palette.Blue else Palette.RefIcon, modifier = Modifier.size(20.dp),
                     )
                 }
                 

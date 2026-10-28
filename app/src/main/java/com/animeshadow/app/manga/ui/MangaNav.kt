@@ -49,12 +49,12 @@ fun MangaNavGraph(nav: NavHostController, openMenu: () -> Unit, toggle: @Composa
             Routes.M_TITLE,
             arguments = listOf(navArgument("id") { type = NavType.IntType }, navArgument("downloaded") { type = NavType.BoolType; defaultValue = false }),
         ) {
-            MangaTitleScreen({ nav.popBackStack() }, openGenre, onRead = { id, key -> nav.navigate(Routes.mReader(id, key)) })
+            MangaTitleScreen({ nav.popBackStack() }, openGenre, onRead = { id, key -> nav.navigate(Routes.mReader(id, key)) }, onOpenTitle = openTitle)
         }
         composable(
             Routes.M_READER,
             arguments = listOf(navArgument("id") { type = NavType.IntType }, navArgument("key") { type = NavType.StringType }),
         ) { ReaderScreen({ nav.popBackStack() }) }
-        sharedScreens(nav, openMenu) { }
+        sharedScreens(nav, openMenu, manga = true) { }
     }
 }

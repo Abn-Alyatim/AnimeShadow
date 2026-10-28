@@ -11,6 +11,10 @@ import retrofit2.http.Path
 interface JikanApi {
     @GET("v4/anime/{id}")
     suspend fun anime(@Path("id") malId: Int): JikanAnimeResponse
+
+    /** v1.3.1: the manga page shows the MAL cell too (same response shape: score, scored_by, members). */
+    @GET("v4/manga/{id}")
+    suspend fun manga(@Path("id") malId: Int): JikanAnimeResponse
 }
 
 @Serializable

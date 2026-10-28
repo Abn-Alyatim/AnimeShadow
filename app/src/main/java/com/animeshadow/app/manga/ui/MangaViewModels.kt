@@ -210,12 +210,14 @@ class MangaTitleViewModel @Inject constructor(
     private val downloadedOnly: Boolean = state.get<Boolean>("downloaded") ?: false
     private val remote = MutableStateFlow<List<ProviderChapter>>(emptyList())
     private val flags = MutableStateFlow(Triple(false, true, false)) // chaptersLoading, newestFirst, failed
+    /** v1.3.1: «جارٍ الترجمة…» only while a translation is really running (1.3.0 showed it forever after a failure). */
+    private val translatingNow = MutableStateFlow(false)
 
     val ui: StateFlow<MangaTitleUi> = combine(
         repo.observe(id), repo.observeEntry(id), downloads.observeTitleDownloads(id), repo.observeTitleHistory(id),
-        combine(remote, flags) { r, f -> r to f },
-    ) { m, e, dls, hist, (rem, f) ->
-        build(m, e, dls, hist, rem, f.first, f.second, f.third)
+        combine(remote, flags, translatingNow) { r, f, t -> Triple(r, f, t) },
+    ) { m, e, dls, hist, (rem, f, t) ->
+        build(m, e, dls, hist, rem, f.first, f.second, f.third).let { it.copy(translating = t && m?.descriptionAr == null && m?.description != null) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MangaTitleUi(downloadedOnly = downloadedOnly))
 
     private fun build(
@@ -244,7 +246,8 @@ class MangaTitleViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             try { repo.refreshDetails(id) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; flags.value = flags.value.copy(third = true) }
-            runCatching { repo.translate(id) }
+            translatingNow.value = true
+            try { runCatching { repo.translate(id) } } finally { translatingNow.value = false }
             loadChapters()
         }
     }

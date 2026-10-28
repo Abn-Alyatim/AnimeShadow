@@ -6,6 +6,14 @@
 
 ## العربية
 
+### الجديد في 1.3.1 (versionCode 6)
+- **فيديو البداية وتسجيل الدخول بدون مربّع**: خلفية الفيديو صارت سوداء تماماً (#000) وأطرافه الأربعة تذوب في الأسود، فتظهر الشخصية واللهب فقط على الشاشة السوداء بأي مقاس جوال، وبحجم أكبر (~1.2×).
+- **التبديل إلى المانجا**: مؤشر التحميل كان يعرض الفيديو القديم (نسخة 1.2) وأحياناً مربعاً فارغاً؛ الآن نفس فيديو مدين في كل مكان، مع صورة ثابتة دائماً حتى يبدأ.
+- **كلمات المانجا**: أفعال المشاهدة بصيغة المؤنث (أشاهدها، شاهدتها، أخطط لمشاهدتها، توقفت عن مشاهدتها)، والملف الشخصي في وضع المانجا يعرض أرقام المانجا (الفصول التي تمت مشاهدتها).
+- **صفحة المانجا مثل صفحة الأنمي**: نفس الرأس وصف التقييم (AniList، MAL، تقييمك، قائمتي)، نفس نافذة التقييم، الملخص بالعربي، التصنيفات، جدول المعلومات (مع المؤلف)، و«ذات صلة» مع السابق / التالي.
+- **العناوين**: الإنجليزي في الأعلى والياباني تحته، ومرة واحدة إذا كانا نفس العنوان.
+- **كل الأيقونات بيضاء** (#FFFFFF)، والجرس خط أبيض رفيع بدون تعبئة؛ العنصر المختار فقط بلون التطبيق.
+
 ### الجديد في 1.3.0 (versionCode 5)
 - **وضع المانجا**: زر «أنمي | مانجا» أعلى الشاشة الرئيسية، يتبدّل فوراً وكل وضع له قائمته ومفضلته وسجله الخاص. بيانات المانجا من AniList مع فلتر مانجا / مانهوا / مانها (اليابان / كوريا / الصين).
 - صفحة العمل بتبويبين «التفاصيل» و«الفصول»، قارئ مدمج (عمودي للمانهوا والمانها، صفحات من اليمين لليسار للمانجا، خلفية سوداء، ملاءمة العرض، الشاشة تبقى مضاءة) بشاشة صافية: ضغطة بالمنتصف تُظهر الأزرار وتختفي بعد 3 ثوانٍ. ⚙️ فيها كل الإعدادات و«استعادة الافتراضي».
@@ -89,6 +97,14 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`. نسخة release تُوقّع 
 ---
 
 ## English
+
+### What's new in 1.3.1 (versionCode 6)
+- Splash/login video with no visible box: its haze is crushed to pure #000 and all four edges feather into black, so only the character and flames show on the black screen at any phone size (and ~1.2× larger).
+- Switching to Manga: the loader played the old v1.2 clip and could be an empty box; it now uses the same video everywhere and always draws a still frame until the animation starts.
+- Manga words: feminine watching verbs (أشاهدها، شاهدتها، أخطط لمشاهدتها، توقفت عن مشاهدتها); the profile in manga mode shows manga numbers.
+- Manga details page laid out like the anime page: same header, rating row (AniList, MAL, your rating, my list), same rating dialog, Arabic synopsis, genre chips, info grid (author), related row with prequel/sequel badges. manga.db 1→2 migration keeps the library.
+- Titles: English on top, Japanese below, shown once when identical.
+- All icons pure white; the bell is a thin white outline; only the selected item keeps the accent colour.
 
 ### What's new in 1.3.0 (versionCode 5)
 - **Manga mode**: «أنمي | مانجا» toggle in the home top bar; instant switch, separate library/favourites/history per mode (own `manga.db`). AniList MANGA with a manga/manhwa/manhua (JP/KR/CN) filter.

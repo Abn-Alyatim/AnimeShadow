@@ -48,8 +48,18 @@ data class MangaEntity(
     val isAdult: Boolean = false,
     val detailLoaded: Boolean = false,
     val cachedAt: Long = 0,
+    // v1.3.1 (manga.db version 2, columns added by MIGRATION_1_2 — the library is kept):
+    val idMal: Int? = null,
+    /** Story / art authors, "|"-separated (info grid «المؤلف»). */
+    val authors: String? = null,
+    /** JSON list of [MangaRelation] («ذات صلة», السابق / التالي). */
+    val relationsJson: String? = null,
+    val malScore: Double? = null,
+    val malScoredBy: Int? = null,
 ) {
     val displayTitle: String get() = titleEnglish ?: titleRomaji ?: titleNative ?: ""
+    val authorList: List<String> get() = authors.orEmpty().split('|').filter { it.isNotBlank() }
+    val relationList: List<MangaRelation> get() = MangaRelation.decode(relationsJson)
     val poster: String? get() = coverXL ?: cover
     val genreList: List<String> get() = genres.split('|').filter { it.isNotBlank() }
     val kind: MangaKind get() = MangaKind.of(country)
@@ -175,6 +185,7 @@ interface MangaDao {
             val o = old[n.id]
             if (o == null || !o.detailLoaded || n.detailLoaded) n.copy(descriptionAr = n.descriptionAr ?: o?.descriptionAr)
             else o.copy(score = n.score ?: o.score, status = n.status ?: o.status, chapters = n.chapters ?: o.chapters, coverXL = n.coverXL ?: o.coverXL, cachedAt = n.cachedAt)
+            // (o keeps idMal / authors / relations / MAL score: card data never has them)
         })
     }
 
@@ -196,6 +207,8 @@ interface MangaDao {
     fun observeHistory(): Flow<List<HistoryRow>>
     @Query("SELECT * FROM manga_history WHERE mangaId = :id ORDER BY readAt DESC") fun observeTitleHistory(id: Int): Flow<List<MangaHistoryEntity>>
     @Query("DELETE FROM manga_history") suspend fun clearHistory()
+    /** v1.3.1 manga profile: chapters watched to the end. */
+    @Query("SELECT COUNT(*) FROM manga_history WHERE finished = 1") fun observeFinishedChapterCount(): Flow<Int>
 }
 
 @Dao
@@ -249,7 +262,7 @@ interface DownloadDao {
 
 @Database(
     entities = [MangaEntity::class, MangaFeedEntity::class, MangaLibraryEntity::class, MangaHistoryEntity::class, DownloadEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class MangaDatabase : RoomDatabase() {
@@ -258,5 +271,16 @@ abstract class MangaDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "manga.db"
+
+        /** 1.3.0 → 1.3.1: five nullable detail columns; every existing row (library, history, downloads) stays. */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `manga` ADD COLUMN `idMal` INTEGER")
+                db.execSQL("ALTER TABLE `manga` ADD COLUMN `authors` TEXT")
+                db.execSQL("ALTER TABLE `manga` ADD COLUMN `relationsJson` TEXT")
+                db.execSQL("ALTER TABLE `manga` ADD COLUMN `malScore` REAL")
+                db.execSQL("ALTER TABLE `manga` ADD COLUMN `malScoredBy` INTEGER")
+            }
+        }
     }
 }

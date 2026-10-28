@@ -6,7 +6,7 @@
     <string name="avatar_change">تغيير الصورة</string>
     <string name="avatar_delete">حذف الصورة</string>
     <string name="cd_download">تنزيل الفصل</string>
-    <string name="cd_mark_read">تمت القراءة</string>
+    <string name="cd_mark_read">تمت المشاهدة</string>
     <string name="cd_reorder">اسحب لتغيير الترتيب</string>
     <string name="cd_telegram">مراسلة المطوّر على تيليجرام</string>
     <string name="google_login">تسجيل الدخول بحساب Google</string>
@@ -28,7 +28,7 @@
     <string name="manga_chapter_n">الفصل %1$s</string>
     <string name="manga_chapters">الفصول</string>
     <string name="manga_chapters_count">%1$d فصل</string>
-    <string name="manga_chapters_soon">مصدر الفصول لم يُضف بعد. أول ما نضيف مصدراً قانونياً تظهر الفصول هنا وتقدر تقرأ وتحمّل.</string>
+    <string name="manga_chapters_soon">مصدر الفصول لم يُضف بعد. أول ما نضيف مصدراً قانونياً تظهر الفصول هنا وتقدر تشاهدها وتحمّلها.</string>
     <string name="manga_continue">تابع الفصل %1$s</string>
     <string name="manga_dl_channel">تنزيل الفصول</string>
     <string name="manga_dl_running">جارٍ تنزيل الفصول</string>
@@ -41,7 +41,7 @@
     <string name="manga_move_top">أولاً في القائمة</string>
     <string name="manga_no_chapters">لا توجد فصول بعد.</string>
     <string name="manga_no_downloaded_chapters">لا توجد فصول محمّلة لهذا العمل.</string>
-    <string name="manga_no_downloads">لم تحمّل أي فصل بعد. افتح أي مانجا ونزّل فصولها لتقرأها بدون نت.</string>
+    <string name="manga_no_downloads">لم تحمّل أي فصل بعد. افتح أي مانجا ونزّل فصولها لتشاهدها بدون نت.</string>
     <string name="manga_origin">الأصل</string>
     <string name="manga_pause">إيقاف مؤقت</string>
     <string name="manga_pause_all">إيقاف الكل</string>
@@ -60,24 +60,24 @@
     <string name="mode_anime">أنمي</string>
     <string name="mode_manga">مانجا</string>
     <string name="my_list_short">قائمتي</string>
-    <string name="read_completed">أكملتها</string>
-    <string name="read_dropped">تركتها</string>
+    <string name="read_completed">شاهدتها</string>
+    <string name="read_dropped">توقفت عن مشاهدتها</string>
     <string name="read_on_hold">متوقفة</string>
-    <string name="read_plan">أخطط لقراءتها</string>
-    <string name="read_reading">أقرأها</string>
+    <string name="read_plan">أخطط لمشاهدتها</string>
+    <string name="read_reading">أشاهدها</string>
     <string name="reader_auto_hide">إخفاء الأزرار تلقائياً بعد 3 ثوانٍ</string>
     <string name="reader_auto_scroll">تمرير تلقائي</string>
     <string name="reader_auto_scroll_speed">سرعة التمرير</string>
     <string name="reader_brightness">السطوع</string>
     <string name="reader_brightness_auto">سطوع الجهاز (تلقائي)</string>
-    <string name="reader_clean_screen">شاشة صافية أثناء القراءة</string>
+    <string name="reader_clean_screen">شاشة صافية أثناء المشاهدة</string>
     <string name="reader_controls_anywhere">ضغطة بأي مكان</string>
     <string name="reader_controls_center">ضغطة بالمنتصف</string>
     <string name="reader_controls_how">إظهار الأزرار</string>
     <string name="reader_dir_ltr">من اليسار لليمين</string>
     <string name="reader_dir_rtl">من اليمين لليسار</string>
     <string name="reader_dir_vertical">عمودي (سحب)</string>
-    <string name="reader_direction">اتجاه القراءة</string>
+    <string name="reader_direction">اتجاه المشاهدة</string>
     <string name="reader_fit">الملاءمة</string>
     <string name="reader_fit_height">الارتفاع</string>
     <string name="reader_fit_screen">الشاشة كاملة</string>
@@ -87,10 +87,10 @@
     <string name="reader_no_pages">صفحات هذا الفصل غير متاحة الآن.</string>
     <string name="reader_offline">محمّل</string>
     <string name="reader_page_gap">المسافة بين الصفحات</string>
-    <string name="reader_prefetch">تجهيز الفصل التالي أثناء القراءة</string>
+    <string name="reader_prefetch">تجهيز الفصل التالي أثناء المشاهدة</string>
     <string name="reader_prev_chapter">الفصل السابق</string>
     <string name="reader_reset">استعادة الافتراضي</string>
-    <string name="reader_settings">إعدادات القارئ</string>
+    <string name="reader_settings">إعدادات المشاهدة</string>
     <string name="reader_tap_zones">الضغط على الأطراف لتقليب الصفحة</string>
     <string name="reader_this_title_only">لهذا العمل فقط</string>
     <string name="reader_volume_keys">أزرار الصوت لتقليب الصفحات</string>
@@ -99,6 +99,14 @@
     <string name="sort_oldest_first">الأقدم أولاً</string>
     <string name="unknown">غير معروف</string>
     <string name="manga_empty_list">لا توجد مانجا هنا بعد.</string>
-    <string name="manga_history">آخر القراءات</string>
+    <string name="manga_history">آخر المشاهدات</string>
     <string name="manga_browse">لائحة المانجا</string>
+    <!-- v1.3.1: the manga profile shows MANGA stats (watching words, feminine; chapters for numbers) -->
+    <string name="manga_stats_chapters">عدد الفصول التي تمت مشاهدتها : %1$s</string>
+    <string name="manga_fav">المانجا المفضلة</string>
+    <!-- v1.3.1: manga details like the anime page -->
+    <string name="rate_art">الرسم</string>
+    <string name="info_author">المؤلف</string>
+    <string name="info_kind">النوع</string>
+    <string name="info_status">الحالة</string>
 </resources>

@@ -106,6 +106,8 @@ data class ProfileUi(
     val stats: LibraryStats? = null,
     val favoriteCount: Int = 0,
     val cover: AnimeEntity? = null,
+    /** v1.3.1: the manga side's numbers, shown when the profile is opened in MANGA mode. */
+    val manga: com.animeshadow.app.manga.data.MangaStats? = null,
 )
 
 @HiltViewModel
@@ -114,11 +116,16 @@ class ProfileViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val google: GoogleAccountRepository,
     @ApplicationContext private val context: Context,
+    manga: com.animeshadow.app.manga.data.MangaRepository,
 ) : ViewModel() {
-    val ui: StateFlow<ProfileUi> = combine(library.observeLibrary(), library.observeFavoriteAnimeCount(), settings.settings) { items, favs, s ->
+    private val mangaStats = combine(manga.observeLibrary(), manga.observeFavorites(), manga.observeFinishedChapterCount()) { lib, fav, ch ->
+        com.animeshadow.app.manga.data.MangaStatsCalculator.compute(lib, fav, ch)
+    }
+
+    val ui: StateFlow<ProfileUi> = combine(library.observeLibrary(), library.observeFavoriteAnimeCount(), settings.settings, mangaStats) { items, favs, s, m ->
         val cover = items.filter { it.anime?.banner != null }.maxByOrNull { it.entry.userScore ?: 0 }?.anime
             ?: items.firstOrNull { it.anime != null }?.anime
-        ProfileUi(s.profile, StatsCalculator.compute(items, s.defaultEpisodeMinutes), favs, cover)
+        ProfileUi(s.profile, StatsCalculator.compute(items, s.defaultEpisodeMinutes), favs, cover, m)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfileUi())
 
     val account: StateFlow<GoogleAccount> = google.account
@@ -159,13 +166,15 @@ fun ProfileContent(
     account: GoogleAccount = GoogleAccount(),
     onLogin: () -> Unit = {},
     onLogout: () -> Unit = {},
+    manga: Boolean = false,
 ) {
-    val stats = ui.stats
+    val stats = if (manga) null else ui.stats
     Scaffold(containerColor = Palette.Black, topBar = { AppTopBar(stringResource(R.string.nav_stats), onMenu = onMenu) }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize().testTag("profile_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
                 Box(Modifier.fillMaxWidth().height(210.dp)) {
-                    Poster(ui.cover?.banner ?: ui.cover?.coverXL, Modifier.fillMaxWidth().height(150.dp), placeholderColor = ui.cover?.color)
+                    if (manga) Poster(ui.manga?.coverUrl, Modifier.fillMaxWidth().height(150.dp))
+                    else Poster(ui.cover?.banner ?: ui.cover?.coverXL, Modifier.fillMaxWidth().height(150.dp), placeholderColor = ui.cover?.color)
                     Box(Modifier.fillMaxWidth().height(150.dp).background(Brush.verticalGradient(listOf(Color(0x33000000), Color(0xFF000000)))))
                     Avatar(ui.profile.avatarPath, Modifier.align(Alignment.BottomCenter).testTag("profile_avatar"))
                 }
@@ -179,6 +188,7 @@ fun ProfileContent(
                 }
             }
             item { AccountSection(account, onLogin, onLogout) }
+            if (manga) ui.manga?.let { m -> mangaStatsItems(m) }
             if (stats != null) {
                 item {
                     Card {
@@ -216,6 +226,35 @@ fun ProfileContent(
                     }
                 }
             }
+        }
+    }
+}
+
+/** v1.3.1: MANGA-mode profile numbers (feminine watching words, chapters as the unit). */
+private fun androidx.compose.foundation.lazy.LazyListScope.mangaStatsItems(m: com.animeshadow.app.manga.data.MangaStats) {
+    item {
+        Card {
+            DonutChart(
+                listOf(ChartSlice(stringResource(R.string.manga_fav), m.favorites, Palette.Favorite)) +
+                    com.animeshadow.app.manga.data.ReadStatus.entries.map { s ->
+                        ChartSlice(com.animeshadow.app.manga.ui.readStatusLabel(s), m.count(s), watchStatusColor(WatchStatus.entries[s.ordinal]))
+                    },
+                centerText = m.total.toString(),
+                showPercent = false,
+            )
+            Text(
+                stringResource(R.string.manga_stats_chapters, m.chaptersWatched),
+                style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp).testTag("manga_stats_chapters"),
+            )
+            m.meanUserScore?.let {
+                Text(stringResource(R.string.stats_mean_score) + ": ★ " + String.format(Locale.US, "%.1f", it), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+    }
+    if (m.topGenres.isNotEmpty()) item {
+        Card {
+            SectionHeader(stringResource(R.string.stats_top_genres))
+            HorizontalBars(m.topGenres.map { ChartSlice(it.first, it.second, Palette.Accent) })
         }
     }
 }
@@ -337,10 +376,10 @@ fun EditProfileContent(
 }
 
 @Composable
-fun ProfileScreen(onMenu: () -> Unit, onEdit: () -> Unit, onLogin: () -> Unit, vm: ProfileViewModel = hiltViewModel()) {
+fun ProfileScreen(onMenu: () -> Unit, onEdit: () -> Unit, onLogin: () -> Unit, manga: Boolean = false, vm: ProfileViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
-    ProfileContent(ui, onMenu, onEdit, account, onLogin, { vm.signOut() })
+    ProfileContent(ui, onMenu, onEdit, account, onLogin, { vm.signOut() }, manga = manga)
 }
 
 @Composable

@@ -1,6 +1,17 @@
 package com.animeshadow.app.manga.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.absolutePadding
+import com.animeshadow.app.ui.common.groupedCount
+import com.animeshadow.app.ui.common.formatRes
+import com.animeshadow.app.ui.common.CornerBadge
+import com.animeshadow.app.ui.common.SectionHeader
+import com.animeshadow.app.ui.common.watchStatusColor
+import com.animeshadow.app.manga.data.MangaRelation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -342,7 +353,7 @@ fun MangaSearchContent(ui: MangaSearchUi, onBack: (() -> Unit)?, onMenu: () -> U
                         else IconButton(onClick = onMenu) { Icon(Icons.Filled.Menu, stringResource(R.string.cd_menu), tint = Palette.RefIcon) }
                     },
                     actions = { GridToggle(ui.grid, onToggleGrid) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Black),
+                    colors = TopAppBarDefaults.topAppBarColors(navigationIconContentColor = Palette.RefIcon, actionIconContentColor = Palette.RefIcon, containerColor = Palette.Black),
                 )
             }
         },
@@ -379,6 +390,7 @@ class MangaTitleActions(
     val onDownload: (ChapterRow.Remote) -> Unit = {},
     val onDownloadAll: () -> Unit = {},
     val onDelete: (String) -> Unit = {},
+    val onOpenTitle: (Int) -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -415,7 +427,7 @@ fun MangaTitleContent(ui: MangaTitleUi, actions: MangaTitleActions, initialTab: 
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Black),
+                colors = TopAppBarDefaults.topAppBarColors(navigationIconContentColor = Palette.RefIcon, actionIconContentColor = Palette.RefIcon, containerColor = Palette.Black),
             )
         },
         floatingActionButton = {
@@ -447,115 +459,216 @@ fun MangaTitleContent(ui: MangaTitleUi, actions: MangaTitleActions, initialTab: 
     }
 }
 
+/**
+ * v1.3.1 (Madyan): the manga page is laid out exactly like the anime page — same header (poster LEFT, English title,
+ * Japanese title under it, status, kind | chapters), same four-cell rating row (AniList ★ + count, MAL, your ★
+ * «تقييمك», «قائمتي»), same rating dialog, same Arabic synopsis with «…», same genre chips, info grid and
+ * «ذات صلة» row with السابق / التالي badges. A section with no data is not drawn at all.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MangaDetailsTab(ui: MangaTitleUi, m: MangaEntity, actions: MangaTitleActions) {
-    var statusMenu by remember { mutableStateOf(false) }
     var rate by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("manga_details")) {
-        // Ref: poster on the LEFT over a darkened cover, title and status beside it.
-        Box(Modifier.fillMaxWidth().height(200.dp)) {
-            Poster(m.banner ?: m.poster, Modifier.fillMaxSize(), placeholderColor = m.color)
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xCC000000), Color(0xEE000000), Color.Black))))
-            Row(Modifier.fillMaxSize().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Poster(m.poster, Modifier.width(118.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(4.dp)), m.displayTitle, m.color)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(m.displayTitle, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, textDirection = TextDirection.Content), fontWeight = FontWeight.Bold, color = Color.White, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(6.dp))
-                    Text(label(statusRes(m.status), m.status), style = MaterialTheme.typography.bodyMedium, color = Palette.RefText)
-                    Text(kindLabel(m.kind) + (m.chapters?.let { " • " + stringResource(R.string.manga_chapters_count, it) } ?: ""), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+    androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize().testTag("manga_details"), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 80.dp)) {
+        item(key = "header") { MangaHeader(m) }
+        item(key = "ratings") { MangaRatingRow(ui, m, actions) { rate = true } }
+        item(key = "synopsis") { MangaSynopsis(ui, m) }
+        if (m.genreList.isNotEmpty()) item(key = "genres") {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                FlowRow(
+                    Modifier.fillMaxWidth().absolutePadding(left = 15.dp, right = 35.dp, top = 8.dp, bottom = 0.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    m.genreList.forEach { g -> com.animeshadow.app.ui.details.RefChip(genreLabel(g), Modifier.clickable { actions.onGenre(g) }.testTag("genre_$g")) }
                 }
             }
         }
-        // Ref row of three: ★ score/10 | ☆ «إضافة تقييم» | + «قائمتي».
-        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Star, null, tint = Color(0xFFEC9A33), modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("\u2066" + (scoreText(m.score) ?: "-") + "/10\u2069", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+        item(key = "info") { MangaInfoGrid(m) }
+        val rel = MangaRelation.forPage(m.relationList)
+        if (rel.isNotEmpty()) item(key = "related") { MangaRelatedRow(rel, actions.onOpenTitle) }
+    }
+    if (rate) {
+        val us = ui.entry?.userScore
+        com.animeshadow.app.ui.details.RatingDialog(
+            m.displayTitle,
+            if (us != null) com.animeshadow.app.data.RatingParts(us, us, us, 0) else com.animeshadow.app.data.RatingParts(),
+            { r -> actions.onUserScore(Math.round((r.story + r.characters + r.animation) / 3.0).toInt().coerceIn(0, 10)); rate = false },
+            { rate = false },
+            manga = true,
+        )
+    }
+}
+
+/** Same header as the anime page (ref 11 measures): 113×158 poster on the left, text column bottom-aligned beside it. */
+@Composable
+private fun MangaHeader(m: MangaEntity) {
+    Row(Modifier.fillMaxWidth().padding(start = 15.dp, end = 12.dp, top = 15.dp), verticalAlignment = Alignment.Bottom) {
+        Poster(m.poster, Modifier.width(113.dp).height(158.dp).clip(RoundedCornerShape(2.dp)).testTag("poster"), m.displayTitle, m.color)
+        Spacer(Modifier.width(15.dp))
+        Column(Modifier.weight(1f).padding(bottom = 14.dp)) {
+            val (title, second) = com.animeshadow.app.ui.common.titlePair(m.titleEnglish, m.titleRomaji, m.titleNative)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = RefType.Title, lineHeight = 20.sp, lineHeightStyle = com.animeshadow.app.ui.details.TightCenter),
+                color = Color.White, maxLines = if (second != null) 2 else 3, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Left,
+                modifier = Modifier.padding(bottom = 1.dp).testTag("title"),
+            )
+            if (second != null) com.animeshadow.app.ui.common.SecondTitle(second)
+            com.animeshadow.app.ui.details.HeaderLine(label(statusRes(m.status), m.status))
+            val year = m.startDate?.take(4)
+            if (year != null) com.animeshadow.app.ui.details.HeaderLine(year)
+            val kindLine = listOfNotNull(kindLabel(m.kind), m.chapters?.let { stringResource(R.string.manga_chapters_count, it) }).joinToString(" | ")
+            com.animeshadow.app.ui.details.HeaderLine(kindLine, Modifier.testTag("type_line"))
+        }
+    }
+}
+
+/** The anime page's rating row, cell for cell: AniList ★ score + count, MAL, your ★ «تقييمك», «قائمتي» with its menu. */
+@Composable
+private fun MangaRatingRow(ui: MangaTitleUi, m: MangaEntity, actions: MangaTitleActions, onRate: () -> Unit) {
+    var statusMenu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 13.dp, bottom = 0.dp).testTag("m_rating_row"), verticalAlignment = Alignment.Top) {
+        com.animeshadow.app.ui.details.RatingCell(Modifier.weight(1f), { Icon(Icons.Filled.Star, null, tint = Palette.Star, modifier = Modifier.size(26.dp)) }) {
+            com.animeshadow.app.ui.details.ScoreOutOf10(m.score?.takeIf { it > 0 }?.let { String.format(java.util.Locale.US, "%.1f", it / 10.0) })
+            com.animeshadow.app.ui.details.CellSub(m.popularity?.let { groupedCount(it) } ?: "—")
+        }
+        if (m.malScore != null) {
+            com.animeshadow.app.ui.details.RatingCell(Modifier.weight(1f).testTag("mal_cell"), { com.animeshadow.app.ui.details.MalLogo() }) {
+                com.animeshadow.app.ui.details.ScoreOutOf10(String.format(java.util.Locale.US, "%.2f", m.malScore))
+                com.animeshadow.app.ui.details.CellSub(m.malScoredBy?.let { groupedCount(it) } ?: "—")
             }
-            Row(Modifier.weight(1f).clickable { rate = true }.testTag("m_rate"), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                val us = ui.entry?.userScore
-                Icon(if (us != null) Icons.Filled.Star else Icons.Filled.StarBorder, null, tint = if (us != null) Palette.Accent else Palette.RefIcon, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(if (us != null) "\u2066$us/10\u2069" else stringResource(R.string.manga_add_rating), color = Palette.RefText, style = MaterialTheme.typography.bodyMedium)
+        }
+        val us = ui.entry?.userScore
+        com.animeshadow.app.ui.details.RatingCell(Modifier.weight(1f).clickable(onClick = onRate).testTag("m_rate"), { Icon(Icons.Filled.Star, null, tint = Palette.Blue, modifier = Modifier.size(26.dp)) }) {
+            com.animeshadow.app.ui.details.ScoreOutOf10(us?.toString())
+            com.animeshadow.app.ui.details.CellSub(stringResource(R.string.your_score))
+        }
+        Box(Modifier.weight(1f).wrapContentSize(Alignment.TopCenter)) {
+            com.animeshadow.app.ui.details.RatingCell(Modifier.fillMaxWidth().clickable { statusMenu = true }.testTag("m_status"), { Icon(Icons.Outlined.PlayCircle, null, tint = Color.White, modifier = Modifier.size(26.dp)) }) {
+                Text(
+                    stringResource(R.string.my_list),
+                    style = MaterialTheme.typography.titleSmall.copy(fontSize = RefType.Body, lineHeight = 24.sp, lineHeightStyle = com.animeshadow.app.ui.details.TightCenter),
+                    color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1,
+                )
+                com.animeshadow.app.ui.details.CellSub(ui.entry?.status?.let { readStatusLabel(it) } ?: stringResource(R.string.not_in_list), Modifier.testTag("m_status_label"))
             }
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Row(Modifier.clickable { statusMenu = true }.testTag("m_status"), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Add, null, tint = Palette.RefIcon, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(ui.entry?.status?.let { readStatusLabel(it) } ?: stringResource(R.string.my_list_short), color = if (ui.entry?.status != null) Palette.Accent else Palette.RefText, style = MaterialTheme.typography.bodyMedium)
+            DropdownMenu(expanded = statusMenu, onDismissRequest = { statusMenu = false }, containerColor = Palette.Card) {
+                ReadStatus.entries.forEach { s ->
+                    val on = s == ui.entry?.status
+                    DropdownMenuItem(
+                        text = { Text(readStatusLabel(s), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, color = if (on) Palette.Blue else Palette.Text) },
+                        leadingIcon = { Box(Modifier.size(10.dp).clip(CircleShape).background(watchStatusColor(com.animeshadow.app.data.local.WatchStatus.entries[s.ordinal]))) },
+                        onClick = { statusMenu = false; actions.onStatus(s) },
+                        modifier = Modifier.testTag("m_status_${s.name}"),
+                    )
                 }
-                DropdownMenu(statusMenu, { statusMenu = false }, containerColor = Palette.Card) {
-                    ReadStatus.entries.forEach { s -> DropdownMenuItem(text = { Text(readStatusLabel(s), color = if (ui.entry?.status == s) Palette.Accent else Palette.Text) }, onClick = { statusMenu = false; actions.onStatus(s) }) }
-                    if (ui.entry?.status != null) DropdownMenuItem(text = { Text(stringResource(R.string.remove_from_list), color = Palette.Dropped) }, onClick = { statusMenu = false; actions.onStatus(null) })
+                if (ui.entry?.status != null) {
+                    HorizontalDivider(color = Palette.Divider)
+                    DropdownMenuItem(text = { Text(stringResource(R.string.remove_from_list), color = Palette.Dropped) }, onClick = { statusMenu = false; actions.onStatus(null) })
                 }
             }
         }
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-            Column(Modifier.padding(horizontal = 10.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Palette.Surface).padding(14.dp)) {
-                val text = m.descriptionAr ?: m.description
-                if (!text.isNullOrBlank()) {
-                    Text(text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = RefType.Body, lineHeight = 22.sp, textDirection = TextDirection.Content), color = Palette.RefText)
-                    if (m.descriptionAr != null) Text(stringResource(R.string.machine_translation), style = MaterialTheme.typography.labelSmall, color = Palette.TextMuted, modifier = Modifier.padding(top = 4.dp))
-                } else if (ui.translating) {
-                    Text(stringResource(R.string.translating), style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
-                }
-                if (m.genreList.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        m.genreList.forEach { g ->
-                            Text(genreLabel(g), style = MaterialTheme.typography.bodySmall.copy(fontSize = RefType.Chip), color = Palette.Text,
-                                modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Palette.Chip).clickable { actions.onGenre(g) }.padding(horizontal = 10.dp, vertical = 5.dp))
+    }
+}
+
+/** Same synopsis block as the anime page: Arabic, right-aligned, 5 lines then «…» (tap to expand). */
+@Composable
+private fun MangaSynopsis(ui: MangaTitleUi, m: MangaEntity) {
+    var expanded by remember { mutableStateOf(false) }
+    val arabic = m.descriptionAr?.takeIf { it.isNotBlank() }
+    val text = arabic ?: m.description?.takeIf { it.isNotBlank() } ?: stringResource(R.string.no_synopsis)
+    Column(Modifier.fillMaxWidth().absolutePadding(left = 15.dp, right = 31.dp, top = 27.5.dp, bottom = 0.dp)) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = RefType.Body, lineHeight = 19.2.sp),
+            color = Color(0xFFDFDFDF),
+            textAlign = if (arabic != null) TextAlign.Right else TextAlign.Left,
+            maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.testTag("synopsis"),
+        )
+        if (arabic == null && ui.translating) {
+            Text(stringResource(R.string.translating), style = MaterialTheme.typography.labelSmall, color = Palette.TextMuted, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth().padding(top = 2.dp).testTag("synopsis_note"))
+        }
+    }
+}
+
+/** The anime info grid (right to left, label over value, 56.5 dp rows); authors sit in the studio slot. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MangaInfoGrid(m: MangaEntity) {
+    data class Cell(val label: String, val value: String, val chip: Boolean = false)
+    val cells = buildList {
+        com.animeshadow.app.ui.common.sourceRes(m.source)?.let { add(Cell(stringResource(R.string.info_source), stringResource(it))) }
+        add(Cell(stringResource(R.string.info_kind), kindLabel(m.kind)))
+        add(Cell(stringResource(R.string.info_status), label(statusRes(m.status), m.status).ifBlank { stringResource(R.string.unknown) }))
+        m.chapters?.let { add(Cell(stringResource(R.string.manga_chapters), it.toString())) }
+        m.startDate?.let { add(Cell(stringResource(R.string.info_from), it)) }
+        add(Cell(stringResource(R.string.info_to), m.endDate ?: "?"))
+        m.volumes?.let { add(Cell(stringResource(R.string.manga_volumes), it.toString())) }
+        m.titleEnglish?.let { add(Cell(stringResource(R.string.info_english), it)) }
+    }
+    val authorCell = if (m.authorList.isNotEmpty()) Cell(stringResource(R.string.info_author), m.authorList.joinToString("، "), chip = true) else null
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Column(Modifier.fillMaxWidth().absolutePadding(left = 54.dp, right = 31.dp, top = 19.dp, bottom = 0.dp).testTag("m_info_grid")) {
+            cells.chunked(2).forEach { pair ->
+                Row(Modifier.fillMaxWidth().height(56.5.dp)) {
+                    pair.forEach { c ->
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                            Text(
+                                c.label, style = MaterialTheme.typography.titleSmall.copy(fontSize = RefType.Body, lineHeight = 20.sp, lineHeightStyle = com.animeshadow.app.ui.details.TightCenter),
+                                color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1,
+                            )
+                            Spacer(Modifier.height(1.dp))
+                            if (c.chip) com.animeshadow.app.ui.details.RefChip(c.value, Modifier.testTag("author_chip"), fontSize = 12.sp, pill = true)
+                            else Text(
+                                c.value, style = MaterialTheme.typography.bodyMedium.copy(fontSize = RefType.Body, lineHeight = 20.sp, lineHeightStyle = com.animeshadow.app.ui.details.TightCenter),
+                                color = Color(0xFFC7C7C7), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
-                Spacer(Modifier.height(12.dp))
-                InfoPair(stringResource(R.string.info_source), label(com.animeshadow.app.ui.common.sourceRes(m.source), m.source).ifBlank { stringResource(R.string.unknown) }, stringResource(R.string.manga_origin), kindLabel(m.kind))
-                InfoPair(stringResource(R.string.info_aired_from), m.startDate ?: "?", stringResource(R.string.info_aired_to), m.endDate ?: "?")
-                InfoPair(stringResource(R.string.manga_chapters), m.chapters?.toString() ?: "?", stringResource(R.string.manga_volumes), m.volumes?.toString() ?: "?")
             }
-        }
-        Spacer(Modifier.height(80.dp))
-    }
-    if (rate) RatingDialog(ui.entry?.userScore, { actions.onUserScore(it); rate = false }, { rate = false })
-}
-
-@Composable
-private fun InfoPair(k1: String, v1: String, k2: String, v2: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-        Column(Modifier.weight(1f)) {
-            Text(k1, style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
-            Text("\u2068$v1\u2069", style = MaterialTheme.typography.bodyMedium, color = Palette.RefText)
-        }
-        Column(Modifier.weight(1f)) {
-            Text(k2, style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
-            Text("\u2068$v2\u2069", style = MaterialTheme.typography.bodyMedium, color = Palette.RefText)
+            // Authors in the studio slot: a full-width row so "Muneyuki Kaneshiro، Yuusuke Nomura" is not cut.
+            if (authorCell != null) Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalAlignment = Alignment.Start) {
+                Text(
+                    authorCell.label, style = MaterialTheme.typography.titleSmall.copy(fontSize = RefType.Body, lineHeight = 20.sp, lineHeightStyle = com.animeshadow.app.ui.details.TightCenter),
+                    color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1,
+                )
+                Spacer(Modifier.height(3.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    m.authorList.forEach { a -> com.animeshadow.app.ui.details.RefChip(a, Modifier.testTag("author_chip"), fontSize = 12.sp, pill = true) }
+                }
+            }
         }
     }
 }
 
+/** «ذات صلة» like the anime page: cover cards with the السابق / التالي / مرتبط badge. */
 @Composable
-private fun RatingDialog(initial: Int?, onSave: (Int?) -> Unit, onDismiss: () -> Unit) {
-    var v by remember { mutableFloatStateOf((initial ?: 7).toFloat()) }
-    AlertDialog(
-        onDismissRequest = onDismiss, containerColor = Palette.Card,
-        title = { Text(stringResource(R.string.manga_add_rating)) },
-        text = {
-            Column {
-                Text("\u2066${v.toInt()}/10\u2069", style = MaterialTheme.typography.headlineSmall, color = Palette.Accent, modifier = Modifier.align(Alignment.CenterHorizontally))
-                Slider(v, { v = it }, valueRange = 0f..10f, steps = 9, colors = SliderDefaults.colors(thumbColor = Palette.Accent, activeTrackColor = Palette.Accent))
+private fun MangaRelatedRow(rels: List<MangaRelation>, onOpen: (Int) -> Unit) {
+    Column(Modifier.padding(top = 8.dp).testTag("m_related")) {
+        SectionHeader(stringResource(R.string.related), Modifier.padding(horizontal = 16.dp))
+        androidx.compose.foundation.lazy.LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(rels.size, key = { rels[it].id }) { i ->
+                val r = rels[i]
+                Column(Modifier.width(108.dp).clickable { onOpen(r.id) }.testTag("m_rel_${r.relationType}")) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(0.7f).clip(RoundedCornerShape(10.dp))) {
+                        Poster(r.cover, Modifier.fillMaxSize(), r.title, r.color)
+                        val badge = when (r.relationType) {
+                            "PREQUEL" -> stringResource(R.string.rel_PREQUEL)
+                            "SEQUEL" -> stringResource(R.string.rel_SEQUEL)
+                            else -> stringResource(R.string.rel_OTHER)
+                        }
+                        CornerBadge(badge, Modifier.align(Alignment.TopStart).padding(4.dp))
+                    }
+                    Text(r.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                    val fmt = when (r.format) { "ONE_SHOT" -> "ون شوت"; "NOVEL" -> "رواية"; "MANGA" -> "مانجا"; else -> label(formatRes(r.format), r.format) }
+                    ScoreLabel(r.score, prefix = fmt)
+                }
             }
-        },
-        confirmButton = { TextButton(onClick = { onSave(v.toInt()) }) { Text(stringResource(R.string.ok)) } },
-        dismissButton = {
-            Row {
-                if (initial != null) TextButton(onClick = { onSave(null) }) { Text(stringResource(R.string.delete), color = Palette.Dropped) }
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-            }
-        },
-    )
+        }
+    }
 }
 
 /** Ref «الفصول»: «الفصل-N» on the left; eye (read) and trash (delete) on the right. */
@@ -605,7 +718,7 @@ private fun ChapterItem(row: ChapterRow, actions: MangaTitleActions) {
 }
 
 @Composable
-fun MangaTitleScreen(onBack: () -> Unit, onGenre: (String) -> Unit, onRead: (Int, String) -> Unit, vm: MangaTitleViewModel = hiltViewModel()) {
+fun MangaTitleScreen(onBack: () -> Unit, onGenre: (String) -> Unit, onRead: (Int, String) -> Unit, onOpenTitle: (Int) -> Unit = {}, vm: MangaTitleViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val start = rememberSaveable { if (vm.ui.value.downloadedOnly) 1 else 0 }
     val snackbar = remember { SnackbarHostState() }
@@ -619,6 +732,7 @@ fun MangaTitleScreen(onBack: () -> Unit, onGenre: (String) -> Unit, onRead: (Int
                 if (ok) onRead(vm.id, row.key)
             },
             onToggleRead = { vm.toggleRead(it) }, onDownload = { vm.download(it) }, onDownloadAll = { vm.downloadAll() }, onDelete = { vm.delete(it) },
+            onOpenTitle = onOpenTitle,
         ),
         initialTab = start,
     )
@@ -687,7 +801,7 @@ fun DownloadedContent(ui: DownloadedUi, onMenu: () -> Unit, onQuery: (String) ->
                     },
                     navigationIcon = { IconButton(onClick = { searching = false; onQuery("") }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.cd_back), tint = Palette.RefIcon) } },
                     actions = { GridToggle(ui.grid, onToggleGrid) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.Black),
+                    colors = TopAppBarDefaults.topAppBarColors(navigationIconContentColor = Palette.RefIcon, actionIconContentColor = Palette.RefIcon, containerColor = Palette.Black),
                 )
             } else {
                 AppTopBar(stringResource(R.string.manga_downloaded), onMenu = onMenu) {

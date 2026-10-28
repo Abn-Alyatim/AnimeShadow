@@ -46,6 +46,10 @@ data class MangaMediaDto(
     val source: String? = null,
     val startDate: FuzzyDateDto? = null,
     val endDate: FuzzyDateDto? = null,
+    // v1.3.1 details: MAL id (MAL cell), authors (info grid), relations («ذات صلة» with السابق / التالي).
+    val idMal: Int? = null,
+    val staff: MangaStaffConn? = null,
+    val relations: MangaRelConn? = null,
 ) {
     fun toEntity(now: Long, detail: Boolean): MangaEntity = MangaEntity(
         id = id,
@@ -71,7 +75,51 @@ data class MangaMediaDto(
         isAdult = isAdult == true,
         detailLoaded = detail,
         cachedAt = now,
+        idMal = idMal,
+        authors = staff?.edges.orEmpty()
+            .filter { e -> e.role.orEmpty().let { it.contains("Story", true) || it.contains("Art", true) || it.contains("Original", true) } }
+            .mapNotNull { it.node?.name?.full }.distinct().take(3).joinToString("|").ifBlank { null },
+        relationsJson = relations?.let { r -> MangaRelation.encode(r.edges.mapNotNull { it.toRelation() }) },
     )
+}
+
+@Serializable data class MangaStaffConn(val edges: List<MangaStaffEdge> = emptyList())
+@Serializable data class MangaStaffEdge(val role: String? = null, val node: MangaStaffNode? = null)
+@Serializable data class MangaStaffNode(val name: MangaStaffName? = null)
+@Serializable data class MangaStaffName(val full: String? = null)
+@Serializable data class MangaRelConn(val edges: List<MangaRelEdge> = emptyList())
+@Serializable
+data class MangaRelEdge(val relationType: String? = null, val node: MangaRelNode? = null) {
+    fun toRelation(): MangaRelation? {
+        val n = node ?: return null
+        val t = n.title?.english ?: n.title?.romaji ?: n.title?.native ?: return null
+        return MangaRelation(n.id, relationType ?: "OTHER", n.type ?: "MANGA", n.format, t, n.coverImage?.extraLarge ?: n.coverImage?.large, n.coverImage?.color, n.averageScore)
+    }
+}
+@Serializable
+data class MangaRelNode(val id: Int, val type: String? = null, val format: String? = null, val title: TitleDto? = null, val coverImage: CoverDto? = null, val averageScore: Int? = null)
+
+/** One related title of a manga (stored as JSON on the manga row; only MANGA-type ones open a page in manga mode). */
+@Serializable
+data class MangaRelation(
+    val id: Int,
+    val relationType: String,
+    val type: String,
+    val format: String? = null,
+    val title: String,
+    val cover: String? = null,
+    val color: String? = null,
+    val score: Int? = null,
+) {
+    companion object {
+        private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        fun encode(list: List<MangaRelation>): String = json.encodeToString(kotlinx.serialization.builtins.ListSerializer(serializer()), list)
+        fun decode(s: String?): List<MangaRelation> = if (s.isNullOrBlank()) emptyList() else
+            runCatching { json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(serializer()), s) }.getOrDefault(emptyList())
+        /** السابق first, then التالي, then the rest; manga only (anime has no page in manga mode). */
+        fun forPage(list: List<MangaRelation>): List<MangaRelation> = list.filter { it.type == "MANGA" }
+            .sortedBy { when (it.relationType) { "PREQUEL" -> 0; "SEQUEL" -> 1; else -> 2 } }
+    }
 }
 
 /** AniList descriptions carry light HTML (<br>, <i>) and a "(Source: …)" tail. */
@@ -95,7 +143,7 @@ object MangaQueries {
     """.trimIndent()
 
     val DETAIL = """
-        query(${'$'}id:Int){ Media(id:${'$'}id,type:MANGA){ $CARD description(asHtml:false) source startDate{year month day} endDate{year month day} } }
+        query(${'$'}id:Int){ Media(id:${'$'}id,type:MANGA){ $CARD description(asHtml:false) source startDate{year month day} endDate{year month day} idMal staff(perPage:8,sort:RELEVANCE){edges{role node{name{full}}}} relations{edges{relationType node{id type format title{romaji english native} coverImage{large extraLarge color} averageScore}}} } }
     """.trimIndent()
 
     fun page(page: Int, sort: String, country: String?, genre: String? = null, search: String? = null, perPage: Int = 30) = GqlRequest(

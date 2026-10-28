@@ -28,6 +28,7 @@ class MangaRepository(
     private val clock: Clock,
     private val translator: SynopsisTranslator? = null,
     private val provider: () -> ChapterProvider = { ChapterProviders.active },
+    private val jikan: com.animeshadow.app.data.remote.JikanApi? = null,
 ) {
     private val dao get() = db.manga()
 
@@ -61,7 +62,15 @@ class MangaRepository(
         val m = r.data?.media ?: return
         val old = dao.get(id)
         val e = m.toEntity(clock.now(), detail = true)
-        dao.upsertOne(e.copy(descriptionAr = if (old?.description == e.description) old?.descriptionAr else null))
+        // v1.3.1: MAL score for the MAL cell (optional: Jikan down → the last known value, or no MAL cell).
+        val mal = e.idMal?.let { mid -> runCatching { jikan?.manga(mid)?.data }.getOrNull() }
+        dao.upsertOne(
+            e.copy(
+                descriptionAr = if (old?.description == e.description) old?.descriptionAr else null,
+                malScore = mal?.score ?: old?.malScore,
+                malScoredBy = (mal?.scored_by ?: mal?.members) ?: old?.malScoredBy,
+            ),
+        )
     }
 
     /** MyMemory translation of the synopsis (titles protected); stored once. */
@@ -70,7 +79,9 @@ class MangaRepository(
         val m = dao.get(id) ?: return
         val en = m.description?.takeIf { it.isNotBlank() } ?: return
         if (m.descriptionAr != null) return
-        val ar = runCatching { t.translate(en, listOfNotNull(m.titleEnglish, m.titleRomaji)) }.getOrNull() ?: return
+        // Same call as the anime page: titles marked as titles so they stay untranslated.
+        val keep = listOfNotNull(m.titleEnglish, m.titleRomaji).distinct().map { com.animeshadow.app.data.translate.MyMemoryTranslator.TITLE_PREFIX + it } + m.authorList
+        val ar = runCatching { t.translate(en, keep) }.getOrNull()?.takeIf { it.isNotBlank() } ?: return
         dao.setArabic(id, ar)
     }
 
@@ -96,6 +107,7 @@ class MangaRepository(
     fun observeLibrary() = dao.observeLibrary()
     fun observeFavorites() = dao.observeFavorites()
     fun observeHistory() = dao.observeHistory()
+    fun observeFinishedChapterCount() = dao.observeFinishedChapterCount()
     fun observeTitleHistory(id: Int) = dao.observeTitleHistory(id)
 
     suspend fun recordRead(mangaId: Int, chapterKey: String, number: String, page: Int, pageCount: Int) {

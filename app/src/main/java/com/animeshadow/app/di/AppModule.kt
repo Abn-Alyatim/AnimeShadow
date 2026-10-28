@@ -108,7 +108,7 @@ object AppModule {
 
     @Provides @Singleton
     fun synopsisTranslator(): SynopsisTranslator =
-        MyMemoryTranslator(Network.client(Network.translateLimiter(), connectS = 10, readS = 20, callS = 40), BuildConfig.MYMEMORY_EMAIL)
+        MyMemoryTranslator(Network.client(Network.translateLimiter(), connectS = 10, readS = 20, callS = 40), BuildConfig.MYMEMORY_EMAIL, fallbackUrl = MyMemoryTranslator.FALLBACK_URL)
 
     @Provides @Singleton
     fun libraryRepository(db: AppDatabase, clock: Clock) = LibraryRepository(db, clock)

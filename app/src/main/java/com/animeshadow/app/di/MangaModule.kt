@@ -40,7 +40,7 @@ private val Context.readerStore: DataStore<Preferences> by preferencesDataStore(
 object MangaModule {
     @Provides @Singleton
     fun mangaDatabase(@ApplicationContext context: Context): MangaDatabase =
-        Room.databaseBuilder(context, MangaDatabase::class.java, MangaDatabase.NAME).build()
+        Room.databaseBuilder(context, MangaDatabase::class.java, MangaDatabase.NAME).addMigrations(MangaDatabase.MIGRATION_1_2).build()
 
     @Provides @Singleton
     fun mangaApi(): MangaApi = Retrofit.Builder()
@@ -51,7 +51,8 @@ object MangaModule {
         .create(MangaApi::class.java)
 
     @Provides @Singleton
-    fun mangaRepository(db: MangaDatabase, api: MangaApi, clock: Clock, translator: SynopsisTranslator) = MangaRepository(db, api, clock, translator)
+    fun mangaRepository(db: MangaDatabase, api: MangaApi, clock: Clock, translator: SynopsisTranslator, jikan: com.animeshadow.app.data.remote.JikanApi) =
+        MangaRepository(db, api, clock, translator, jikan = jikan)
 
     /** Page images: no polite limiter (that is for AniList), keep-alive pool and enough parallel calls per host. */
     @Provides @Singleton
