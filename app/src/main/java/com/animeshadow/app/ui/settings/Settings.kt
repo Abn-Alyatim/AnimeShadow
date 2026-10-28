@@ -59,7 +59,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -174,18 +174,7 @@ fun SettingsContent(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize().testTag("settings_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
-            // v1.2: AniList login (optional; behind config).
-            item { Header(stringResource(R.string.settings_account)) }
-            item {
-                if (account.loggedIn) {
-                    AccountRow(account, actions.onLogout)
-                } else {
-                    ClickRow(stringResource(R.string.anilist_login), stringResource(R.string.anilist_login_sub), tag = "anilist_login") {
-                        if (account.configured) actions.onLogin() else dialog = "anilist_off"
-                    }
-                }
-            }
-
+            // v1.3 item 1: the account section moved to the Profile screen.
             item { Header(stringResource(R.string.settings_general)) }
             item { SwitchRow(stringResource(R.string.settings_notify_all), stringResource(R.string.settings_notify_all_sub), s.notifications, actions.onNotifications) }
             item { SwitchRow(stringResource(R.string.settings_save_filter), stringResource(R.string.settings_save_filter_sub), s.saveFilters, actions.onSaveFilters) }
@@ -212,7 +201,7 @@ fun SettingsContent(
             item { ClickRow(stringResource(R.string.settings_share), null, onClick = actions.onShare) }
             item { ClickRow(stringResource(R.string.settings_disclaimer), null) { dialog = "disclaimer" } }
 
-            // v1.2: «عن التطبيق» with the developer row (taps open WhatsApp).
+            // «عن التطبيق» with the developer row (v1.3: taps open Telegram).
             item { Header(stringResource(R.string.settings_about_header)) }
             item { ClickRow(stringResource(R.string.settings_version), "v" + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")", tag = "about_row") { dialog = "about" } }
             item { DeveloperRow(actions.onDeveloper) }
@@ -285,7 +274,7 @@ private fun ClickRow(title: String, sub: String?, danger: Boolean = false, tag: 
 private fun androidx.compose.ui.text.TextStyle.mixed() =
     copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content, textAlign = androidx.compose.ui.text.style.TextAlign.Left)
 
-/** «المطوّر»: name (Arabic / English) and the WhatsApp number; tapping opens wa.me. */
+/** «المطوّر»: name (Arabic / English) and the private Telegram (v1.3: no WhatsApp, no phone number); tapping opens t.me. */
 @Composable
 private fun DeveloperRow(onClick: () -> Unit) {
     Row(
@@ -295,29 +284,13 @@ private fun DeveloperRow(onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.settings_developer), style = MaterialTheme.typography.bodyLarge)
             Text(stringResource(R.string.developer_name), style = MaterialTheme.typography.bodyMedium.mixed(), color = Palette.TextSecondary)
-            // Latin digits, isolated so "+967…" never flips inside Arabic text.
-            Text("\u2066" + stringResource(R.string.developer_phone) + "\u2069", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
+            // Latin, isolated so "@abnalyatim" never flips inside Arabic text.
+            Text("\u2066" + stringResource(R.string.developer_telegram_handle) + "\u2069", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted)
         }
         Icon(
-            Icons.AutoMirrored.Filled.Chat, stringResource(R.string.cd_whatsapp),
-            tint = Color(0xFF25D366), modifier = Modifier.size(24.dp),
+            Icons.AutoMirrored.Filled.Send, stringResource(R.string.cd_telegram),
+            tint = Color(0xFF29A9EB), modifier = Modifier.size(24.dp).testTag("developer_telegram"),
         )
-    }
-    HorizontalDivider(color = Palette.Divider, modifier = Modifier.padding(horizontal = 16.dp))
-}
-
-@Composable
-private fun AccountRow(account: AniListAccount, onLogout: () -> Unit) {
-    Row(Modifier.fillMaxWidth().testTag("anilist_account").padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (account.avatar != null) {
-            coil.compose.AsyncImage(account.avatar, null, Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-            Spacer(Modifier.width(12.dp))
-        }
-        Text(
-            stringResource(R.string.anilist_logged_in_as, "\u2068" + (account.name ?: "AniList") + "\u2069"),
-            style = MaterialTheme.typography.bodyLarge.mixed(), modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onLogout) { Text(stringResource(R.string.anilist_logout), color = Palette.Accent) }
     }
     HorizontalDivider(color = Palette.Divider, modifier = Modifier.padding(horizontal = 16.dp))
 }
@@ -395,7 +368,7 @@ fun SettingsScreen(onMenu: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
             },
             onLogin = { vm.loginUrl()?.let { openUrl(context, it) } },
             onLogout = { vm.logout() },
-            onDeveloper = { openUrl(context, context.getString(R.string.developer_whatsapp_url)) },
+            onDeveloper = { openUrl(context, context.getString(R.string.developer_telegram_url)) },
         ),
         snackbar,
         account,

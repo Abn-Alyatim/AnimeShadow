@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -110,6 +111,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.animeshadow.app.data.auth.GoogleAccountRepository
+import com.animeshadow.app.data.settings.AppMode
+import com.animeshadow.app.manga.ui.MangaNavGraph
+import com.animeshadow.app.ui.auth.LoginScreen
+import com.animeshadow.app.ui.profile.EditProfileScreen
+import kotlinx.coroutines.flow.MutableStateFlow
 
 object Routes {
     const val LATEST = "latest"
@@ -127,6 +142,8 @@ object Routes {
     const val STATS = "stats"
     const val SETTINGS = "settings"
     const val NOTIFICATIONS = "notifications"
+    const val EDIT_PROFILE = "edit_profile"
+    const val LOGIN = "login"
     const val GENRE = "genre/{name}"
     fun genre(name: String) = "genre/" + android.net.Uri.encode(name)
     const val STUDIO = "studio/{name}"
@@ -137,6 +154,21 @@ object Routes {
     fun anime(id: Int) = "anime/$id"
     fun character(id: Int) = "character/$id"
     fun staff(id: Int) = "staff/$id"
+
+    // v1.3 MANGA mode (its own NavHost; profile / settings / login / notifications exist in both).
+    const val M_HOME = "m_home"
+    const val M_SEARCH = "m_search"
+    const val M_LIBRARY = "m_library"
+    const val M_FAVORITES = "m_favorites"
+    const val M_HISTORY = "m_history"
+    const val M_DOWNLOADED = "m_downloaded"
+    const val M_QUEUE = "m_queue"
+    const val M_TITLE = "m_title/{id}?downloaded={downloaded}"
+    fun mTitle(id: Int, downloaded: Boolean = false) = "m_title/$id?downloaded=$downloaded"
+    const val M_GENRE = "m_genre/{name}"
+    fun mGenre(name: String) = "m_genre/" + android.net.Uri.encode(name)
+    const val M_READER = "m_reader/{id}/{key}"
+    fun mReader(id: Int, key: String) = "m_reader/$id/" + android.net.Uri.encode(key)
 }
 
 data class DrawerEntry(val route: String, @StringRes val label: Int, val icon: ImageVector, val dividerBefore: Boolean = false)
@@ -157,65 +189,123 @@ val DrawerEntries = listOf(
     DrawerEntry(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings, dividerBefore = true),
 )
 
+/** The drawer in MANGA mode: same look, its own pages (library, favorites, history, downloads are manga-only). */
+val MangaDrawerEntries = listOf(
+    DrawerEntry(Routes.M_HOME, R.string.manga_home, Icons.Filled.AutoStories),
+    DrawerEntry(Routes.M_SEARCH, R.string.manga_browse, Icons.AutoMirrored.Filled.List),
+    DrawerEntry(Routes.M_LIBRARY, R.string.nav_mylist, Icons.Filled.Bookmarks, dividerBefore = true),
+    DrawerEntry(Routes.M_FAVORITES, R.string.manga_favorites, Icons.Filled.Favorite),
+    DrawerEntry(Routes.M_HISTORY, R.string.manga_history, Icons.Filled.History),
+    DrawerEntry(Routes.M_DOWNLOADED, R.string.manga_downloaded, Icons.Filled.DownloadDone, dividerBefore = true),
+    DrawerEntry(Routes.M_QUEUE, R.string.manga_queue, Icons.Filled.Download),
+    DrawerEntry(Routes.STATS, R.string.nav_stats, Icons.Filled.Person, dividerBefore = true),
+    DrawerEntry(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
+)
+
+/** Top-bar «أنمي | مانجا» switch, provided to the two home screens. */
+val LocalModeToggle = staticCompositionLocalOf<(@Composable () -> Unit)?> { null }
+
 @HiltViewModel
 class RootViewModel @Inject constructor(
-    settings: SettingsRepository,
+    private val settings: SettingsRepository,
     notifications: NotificationRepository,
-    anime: com.animeshadow.app.data.AnimeRepository,
+    google: GoogleAccountRepository,
     @ApplicationContext context: Context,
 ) : ViewModel() {
     val profile: StateFlow<Profile> = settings.settings.map { it.profile }.stateIn(viewModelScope, SharingStarted.Eagerly, Profile())
     val unread: StateFlow<Int> = notifications.observeUnreadCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    val accountName: StateFlow<String> = google.account.map { it.name }.stateIn(viewModelScope, SharingStarted.Eagerly, google.account.value.name)
+
+    /** v1.3 mode. Read once synchronously-ish at start (DataStore), then followed. */
+    private val _mode = MutableStateFlow<AppMode?>(null)
+    val mode: StateFlow<AppMode?> = _mode
+
+    fun setMode(m: AppMode) {
+        _mode.value = m // instant: the UI switches on this frame; the key is written behind it
+        viewModelScope.launch { settings.setMode(m) }
+    }
 
     /**
-     * v1.2 loading animation: the Shadow loop shows on black at start-up and keeps looping while the first screen's
-     * titles are not there yet (first run / weak network), then fades into the app. With titles already cached it
-     * leaves after [SPLASH_MIN_MS]; it never holds the app longer than [SPLASH_MAX_MS] (offline first run → the empty
-     * screen, which a pull refreshes). Lives in the ViewModel, so a rotation does not replay it.
+     * v1.3 item 7: Madyan's video is the splash. It holds about [SPLASH_ONLINE_MS] (2 s), or [SPLASH_OFFLINE_MS]
+     * (5 s) when the phone has no internet, then fades into the app. Lives in the ViewModel, so a rotation does not
+     * replay it.
      */
-    private val _splashDone = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private val _splashDone = MutableStateFlow(false)
     val splashDone: StateFlow<Boolean> = _splashDone
 
     init {
+        viewModelScope.launch { _mode.value = settings.mode.first() }
         if (!SplashConfig.enabled) _splashDone.value = true
         else viewModelScope.launch {
-            val start = System.currentTimeMillis()
-            kotlinx.coroutines.withTimeoutOrNull(SPLASH_MAX_MS) {
-                anime.observeFeed(com.animeshadow.app.data.AnimeRepository.FEED_AIRING).first { it.isNotEmpty() }
-            }
-            val left = SPLASH_MIN_MS - (System.currentTimeMillis() - start)
-            if (left > 0) kotlinx.coroutines.delay(left)
+            kotlinx.coroutines.delay(splashHoldMs(isOnline(context)))
             _splashDone.value = true
         }
-    }
-
-    companion object {
-        const val SPLASH_MIN_MS = 1_200L
-        const val SPLASH_MAX_MS = 9_000L
-    }
-
-    init {
         viewModelScope.launch {
             val s = settings.settings.first()
             LocaleController.apply()
             runCatching { SyncScheduler.schedule(context, s.notifications) }
         }
     }
+
+    companion object {
+        const val SPLASH_ONLINE_MS = 2_000L
+        const val SPLASH_OFFLINE_MS = 5_000L
+
+        fun splashHoldMs(online: Boolean) = if (online) SPLASH_ONLINE_MS else SPLASH_OFFLINE_MS
+
+        fun isOnline(context: Context): Boolean = runCatching {
+            val cm = context.getSystemService(android.net.ConnectivityManager::class.java)
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+            caps != null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }.getOrDefault(true)
+    }
+}
+
+/** «أنمي | مانجا»: a two-part pill; the active part is filled with the accent. */
+@Composable
+fun ModeToggle(mode: AppMode, onMode: (AppMode) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp))
+            .border(1.dp, Palette.Accent, androidx.compose.foundation.shape.RoundedCornerShape(15.dp)).testTag("mode_toggle"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(AppMode.ANIME to R.string.mode_anime, AppMode.MANGA to R.string.mode_manga).forEach { (m, label) ->
+            val on = m == mode
+            Box(
+                Modifier.fillMaxHeight().background(if (on) Palette.Accent else Palette.Black)
+                    .clickable { if (!on) onMode(m) }.padding(horizontal = 10.dp).testTag("mode_" + m.name.lowercase()),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(label), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = if (on) androidx.compose.ui.graphics.Color.White else Palette.TextSecondary, maxLines = 1)
+            }
+        }
+    }
 }
 
 @Composable
-fun DrawerContent(current: String?, profile: Profile, onSelect: (String) -> Unit, unread: Int = 0) {
-    ModalDrawerSheet(drawerContainerColor = Palette.Surface, modifier = Modifier.width(300.dp)) {
+fun DrawerContent(
+    current: String?,
+    profile: Profile,
+    onSelect: (String) -> Unit,
+    unread: Int = 0,
+    entries: List<DrawerEntry> = DrawerEntries,
+    accountName: String = "",
+) {
+    // v1.3 item 3: the drawer is pure black (#000) like the lists, not the grey surface.
+    ModalDrawerSheet(drawerContainerColor = Palette.Black, modifier = Modifier.width(300.dp).testTag("drawer_sheet")) {
         Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().clickable { onSelect(Routes.STATS) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 val m = Modifier.size(56.dp).clip(CircleShape).border(2.dp, Palette.Accent, CircleShape)
                 if (profile.avatarPath != null) AsyncImage(File(profile.avatarPath), null, m, contentScale = ContentScale.Crop)
                 else Image(painterResource(R.drawable.as_logo), null, m.background(Palette.Black), contentScale = ContentScale.Crop)
                 Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(profile.name.ifBlank { stringResource(R.string.profile_default_name) }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("\u2068" + (if (profile.handle.isNotBlank()) "@" + profile.handle else stringResource(R.string.tagline)) + "\u2069", style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-                }
+                // v1.3 item 6: only the account name under the avatar (no «Your Anime. Your Journey.»).
+                Text(
+                    profile.name.ifBlank { accountName }.ifBlank { stringResource(R.string.profile_default_name) },
+                    style = MaterialTheme.typography.titleMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+                    fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).testTag("drawer_name"),
+                )
                 // v1.0 bug: the bell opened the schedule. It opens the Notifications history now.
                 IconButton(onClick = { onSelect(Routes.NOTIFICATIONS) }, modifier = Modifier.testTag("drawer_bell")) {
                     BadgedBox(badge = { if (unread > 0) Badge { Text(if (unread > 99) "99+" else unread.toString()) } }) {
@@ -223,7 +313,7 @@ fun DrawerContent(current: String?, profile: Profile, onSelect: (String) -> Unit
                     }
                 }
             }
-            DrawerEntries.forEach { e ->
+            entries.forEach { e ->
                 if (e.dividerBefore) HorizontalDivider(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), color = Palette.Divider)
                 NavigationDrawerItem(
                     label = { Text(stringResource(e.label), style = MaterialTheme.typography.bodyLarge) },
@@ -234,7 +324,7 @@ fun DrawerContent(current: String?, profile: Profile, onSelect: (String) -> Unit
                         selectedContainerColor = Palette.AccentSoft,
                         selectedIconColor = Palette.Accent,
                         selectedTextColor = Palette.Text,
-                        unselectedContainerColor = Palette.Surface,
+                        unselectedContainerColor = Palette.Black,
                         unselectedIconColor = Palette.TextSecondary,
                         unselectedTextColor = Palette.Text,
                     ),
@@ -247,20 +337,35 @@ fun DrawerContent(current: String?, profile: Profile, onSelect: (String) -> Unit
 }
 
 @Composable
-fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, vm: RootViewModel = hiltViewModel()) {
-    val nav = rememberNavController()
+fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, openDownloads: Boolean = false, onDownloadsOpened: () -> Unit = {}, vm: RootViewModel = hiltViewModel()) {
+    val animeNav = rememberNavController()
+    val mangaNav = rememberNavController()
+    val holder = rememberSaveableStateHolder()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val profile by vm.profile.collectAsStateWithLifecycle()
     val unread by vm.unread.collectAsStateWithLifecycle()
+    val accountName by vm.accountName.collectAsStateWithLifecycle()
+    val storedMode by vm.mode.collectAsStateWithLifecycle()
+    val mode = storedMode ?: AppMode.ANIME
+    val nav = if (mode == AppMode.ANIME) animeNav else mangaNav
+    val entries = if (mode == AppMode.ANIME) DrawerEntries else MangaDrawerEntries
     val back by nav.currentBackStackEntryAsState()
     val current = back?.destination?.route
-    val topLevel = DrawerEntries.any { it.route == current }
+    val topLevel = entries.any { it.route == current }
 
     LaunchedEffect(openAnimeId) {
         if (openAnimeId != null) {
-            nav.navigate(Routes.anime(openAnimeId))
+            vm.setMode(AppMode.ANIME)
+            animeNav.navigate(Routes.anime(openAnimeId))
             onOpened()
+        }
+    }
+    LaunchedEffect(openDownloads, storedMode) {
+        if (openDownloads && storedMode != null) {
+            vm.setMode(AppMode.MANGA)
+            mangaNav.navigate(Routes.M_QUEUE) { launchSingleTop = true }
+            onDownloadsOpened()
         }
     }
 
@@ -268,24 +373,33 @@ fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, vm: RootViewMod
     // v1.2 bug fix: Back with the drawer open closed the screen (or left the app) instead of closing the drawer.
     androidx.activity.compose.BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
     val splashDone by vm.splashDone.collectAsStateWithLifecycle()
+    val toggle: @Composable () -> Unit = { ModeToggle(mode, { m -> vm.setMode(m) }, Modifier.padding(end = 4.dp)) }
     Box(Modifier.fillMaxSize()) {
-    ModalNavigationDrawer(
-        drawerState = drawer,
-        gesturesEnabled = topLevel,
-        drawerContent = {
-            DrawerContent(current, profile, { route ->
-                scope.launch { drawer.close() }
-                if (route != current) nav.navigate(route) {
-                    popUpTo(Routes.LATEST) { saveState = true }
-                    launchSingleTop = true
-                    restoreState = true
+        ModalNavigationDrawer(
+            drawerState = drawer,
+            gesturesEnabled = topLevel,
+            drawerContent = {
+                DrawerContent(current, profile, { route ->
+                    scope.launch { drawer.close() }
+                    val home = if (mode == AppMode.ANIME) Routes.LATEST else Routes.M_HOME
+                    if (route != current) nav.navigate(route) {
+                        popUpTo(home) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }, unread, entries, accountName)
+            },
+        ) {
+            // Each mode keeps its own back stack, screens and scroll positions; switching only changes which one shows.
+            // (Until the stored mode is read — a few ms, under the splash — the anime side shows.)
+            holder.SaveableStateProvider(mode.name) {
+                when (mode) {
+                    AppMode.ANIME -> AppNavHost(animeNav, openMenu, drawer, toggle)
+                    AppMode.MANGA -> MangaNavGraph(mangaNav, openMenu, toggle)
                 }
-            }, unread)
-        },
-    ) {
-        AppNavHost(nav, openMenu, drawer)
-    }
-    ShadowSplash(visible = !splashDone)
+            }
+        }
+        ShadowSplash(visible = !splashDone)
     }
 }
 
@@ -294,7 +408,7 @@ object SplashConfig {
     @Volatile var enabled: Boolean = true
 }
 
-/** Full-screen black with the small Shadow loop; fades out into the UI. */
+/** v1.3: full-screen black with Madyan's video; fades out into the UI. */
 @Composable
 fun ShadowSplash(visible: Boolean) {
     androidx.compose.animation.AnimatedVisibility(
@@ -308,19 +422,28 @@ fun ShadowSplash(visible: Boolean) {
                 .testTag("shadow_splash"),
             contentAlignment = Alignment.Center,
         ) {
-            com.animeshadow.app.ui.common.ShadowLoop(Modifier.width(240.dp))
+            com.animeshadow.app.ui.common.SplashVideo(Modifier.fillMaxWidth(), loop = false)
         }
     }
 }
 
+/** Screens that exist in both modes (account, settings, notifications). */
+fun androidx.navigation.NavGraphBuilder.sharedScreens(nav: NavHostController, openMenu: () -> Unit, openAnime: (Int) -> Unit) {
+    composable(Routes.STATS) { ProfileScreen(openMenu, onEdit = { nav.navigate(Routes.EDIT_PROFILE) }, onLogin = { nav.navigate(Routes.LOGIN) }) }
+    composable(Routes.EDIT_PROFILE) { EditProfileScreen({ nav.popBackStack() }) }
+    composable(Routes.LOGIN) { LoginScreen({ nav.popBackStack() }) }
+    composable(Routes.SETTINGS) { SettingsScreen(openMenu) }
+    composable(Routes.NOTIFICATIONS) { NotificationsScreen({ nav.popBackStack() }, openAnime) }
+}
+
 @Composable
-private fun AppNavHost(nav: NavHostController, openMenu: () -> Unit, @Suppress("UNUSED_PARAMETER") drawer: DrawerState) {
+private fun AppNavHost(nav: NavHostController, openMenu: () -> Unit, @Suppress("UNUSED_PARAMETER") drawer: DrawerState, toggle: @Composable () -> Unit) {
     val open: (Int) -> Unit = { nav.navigate(Routes.anime(it)) }
     val openCharacter: (Int) -> Unit = { nav.navigate(Routes.character(it)) }
     val openStaff: (Int) -> Unit = { nav.navigate(Routes.staff(it)) }
     val search: () -> Unit = { nav.navigate(Routes.SEARCH) }
     NavHost(nav, startDestination = Routes.LATEST) {
-        composable(Routes.LATEST) { HomeScreen(openMenu, search, open) }
+        composable(Routes.LATEST) { CompositionLocalProvider(LocalModeToggle provides toggle) { HomeScreen(openMenu, search, open) } }
         composable(Routes.BROWSE) { BrowseScreen(autoFocus = false, onMenu = openMenu, onBack = null, onOpen = open) }
         composable(Routes.SEARCH) { BrowseScreen(autoFocus = true, onMenu = openMenu, onBack = { nav.popBackStack() }, onOpen = open) }
         composable(Routes.SEASONS) { SeasonsScreen(openMenu, search, open) }
@@ -332,9 +455,7 @@ private fun AppNavHost(nav: NavHostController, openMenu: () -> Unit, @Suppress("
         composable(Routes.POPULAR_CHARACTERS) { PopularCharactersScreen(openMenu, openCharacter) }
         composable(Routes.RECOMMENDATIONS) { RecommendationsScreen(openMenu, open) }
         composable(Routes.SCHEDULE) { ScheduleScreen(openMenu, open) }
-        composable(Routes.STATS) { ProfileScreen(openMenu) }
-        composable(Routes.SETTINGS) { SettingsScreen(openMenu) }
-        composable(Routes.NOTIFICATIONS) { NotificationsScreen({ nav.popBackStack() }, open) }
+        sharedScreens(nav, openMenu, open)
         composable(Routes.GENRE, arguments = listOf(navArgument("name") { type = NavType.StringType })) {
             GenreScreen({ nav.popBackStack() }, open)
         }

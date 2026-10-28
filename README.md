@@ -6,13 +6,21 @@
 
 ## العربية
 
+### الجديد في 1.3.0 (versionCode 5)
+- **وضع المانجا**: زر «أنمي | مانجا» أعلى الشاشة الرئيسية، يتبدّل فوراً وكل وضع له قائمته ومفضلته وسجله الخاص. بيانات المانجا من AniList مع فلتر مانجا / مانهوا / مانها (اليابان / كوريا / الصين).
+- صفحة العمل بتبويبين «التفاصيل» و«الفصول»، قارئ مدمج (عمودي للمانهوا والمانها، صفحات من اليمين لليسار للمانجا، خلفية سوداء، ملاءمة العرض، الشاشة تبقى مضاءة) بشاشة صافية: ضغطة بالمنتصف تُظهر الأزرار وتختفي بعد 3 ثوانٍ. ⚙️ فيها كل الإعدادات و«استعادة الافتراضي».
+- تنزيل سريع (5 صفحات بالتوازي، يكمل من حيث توقف، إشعار أثناء التنزيل)، «قائمة التنزيل» بالسحب لإعادة الترتيب، و«المانجات المحملة» تعمل بدون نت.
+- مصدر الفصول قابل للإضافة (انظر docs/CHAPTER_PROVIDER.md)؛ هذه النسخة بدون مصدر فتظهر «قريباً».
+- الحساب انتقل من الإعدادات إلى الملف الشخصي؛ تسجيل الدخول بحساب Google (انظر GOOGLE_LOGIN_AR.md).
+- سحب أفقي بين التبويبات، القائمة الجانبية سوداء بالكامل وبدون العبارة تحت الصورة، الإحصائيات أرقام فقط، تغيير/حذف الصورة من «تعديل الملف الشخصي»، شاشة البداية فيديو مدين، التواصل مع المطوّر عبر تيليجرام @abnalyatim.
+
 ### الجديد في 1.2.0 (versionCode 4)
 - **السحب للتحديث يشتغل الآن في كل القوائم**: الرئيسية، الأعلى تقييماً، المواسم، البحث، التصنيف، الاستوديو، قائمتي، المفضلة، السجل، الشخصيات الأكثر شعبية، التوصيات، الجدول. السبب أنه كان لا يفعل شيئاً: في 1.1 لم يكن هناك سحب للتحديث أصلاً في أي شاشة، وأي تحديث يدوي أثناء التحميل الأول كان يُتجاهل، والقوائم الفارغة لا تُسحب. الآن السحب يجلب من AniList فعلاً ويعرض البيانات الجديدة (مع اختبار).
 - **لا يوجد زر «إعادة المحاولة»**: الشريط يقول بهدوء «اسحب للأسفل للتحديث»، وبدون نص إنجليزي تقني.
 - **أنميشن التحميل**: مقطع Shadow حقك (3.4 ثانية) صغير على أسود، يتكرر بدون أي قطع، ثم يتلاشى إلى الواجهة. نفس المقطع مكان دائرة التحميل في القوائم. (WebP متحرك 490KB بجودة مطابقة للأصل، وأطرافه تذوب في الأسود.)
 - **تسجيل الدخول بحساب AniList** (اختياري): جاهز، ويُفعَّل برقم العميل. قبل التفعيل يشرح الزر بهدوء أنه لم يُفعَّل بعد. الخطوات في `ANILIST_SETUP_AR.md`.
 - **إعلان صغير تجريبي** (Google Test 320×50) أسفل شاشات القوائم فقط. لا إعلانات منبثقة ولا فيديو ولا صوت، ويبدأ في الخلفية بعد ظهور الشاشة الأولى فلا يبطئ التشغيل.
-- **«عن التطبيق» ← «المطوّر»**: مدين اليتيم / Madyan AL-Yatim ‎+967780647484، والضغط يفتح واتساب.
+- **«عن التطبيق» ← «المطوّر»**: مدين اليتيم / Madyan AL-Yatim (في 1.3 صار التواصل عبر تيليجرام فقط).
 - **إصلاحات**: التدوير لم يعد يفتح الأنمي من الإشعار مرة ثانية، زر الرجوع يغلق القائمة الجانبية أولاً، نوافذ الإعدادات لا تختفي عند التدوير، زر البحث في الكيبورد يبحث فوراً، قائمتي أسرع مع القوائم الطويلة، ترتيب الكلمات صحيح في النصوص العربية التي فيها كلمات إنجليزية.
 
 ### الجديد في 1.1.1 (versionCode 3)
@@ -82,13 +90,21 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`. نسخة release تُوقّع 
 
 ## English
 
+### What's new in 1.3.0 (versionCode 5)
+- **Manga mode**: «أنمي | مانجا» toggle in the home top bar; instant switch, separate library/favourites/history per mode (own `manga.db`). AniList MANGA with a manga/manhwa/manhua (JP/KR/CN) filter.
+- Title page with «التفاصيل» / «الفصول» tabs; built-in reader (vertical for manhwa/manhua, RTL paged for manga, black, fit width, keep screen on), clean immersive screen with centre-tap controls that auto-hide after 3 s, ⚙️ sheet with every option + «استعادة الافتراضي», per-title direction.
+- Fast downloads (5 pages in parallel, resumable, WorkManager foreground job, prefetch next chapter), «قائمة التنزيل» queue with drag reorder, offline «المانجات المحملة» library.
+- Pluggable `ChapterProvider` (docs/CHAPTER_PROVIDER.md); this build ships the empty stub, so chapters show «قريباً».
+- Account moved from Settings to Profile; Google sign-in via Credential Manager (GOOGLE_LOGIN_AR.md for the one Cloud Console step).
+- Swipe between tabs everywhere, pure-black drawer without the tagline, counts-only profile stats, change/delete photo inside Edit Profile, Madyan's video as splash (≈2 s online / ≈5 s offline), developer contact Telegram only (@abnalyatim).
+
 ### What's new in 1.2.0 (versionCode 4)
 - **Pull-to-refresh on every list screen** (Latest, Top, Seasons, Browse/Search, Genre, Studio, My List, Favorite anime, History, Popular characters, Recommendations, Schedule). Why it did nothing in 1.1: there was no pull-to-refresh component on any screen; a forced refresh issued while the automatic first load was running was dropped; and empty/error states were not scrollable, so a pull could not start there. A pull now always re-fetches from AniList and the list shows the new data (tested with a server that answers list A, then list B).
 - **No retry buttons** (golden rule): banners say "pull down to refresh", never raw English exception text.
 - **Loading animation**: Madyan's 3.4 s Shadow loop, small on black, gapless (animated WebP played by AnimatedImageDrawable on the render thread), then a 450 ms fade into the UI; the same loop replaces the list spinners. 640×360, 103 frames, 505 KB, 37–44 dB PSNR vs. the source, edges feathered to pure black.
 - **AniList login behind config**: OAuth implicit grant, `-PanilistClientId=` / `anilist.clientId=` (empty by default → a calm Arabic "not activated yet" dialog). Redirect `animeshadow://anilist-auth`. See `ANILIST_SETUP_AR.md`.
 - **Ads**: one Google TEST banner (320×50) under list screens only; no interstitials, pop-ups, video or sound; SDK initialised lazily off the main thread (plus OPTIMIZE_INITIALIZATION / OPTIMIZE_AD_LOADING). `-PadsEnabled=false` removes it. APK 6.0 MB.
-- **About → Developer** row: مدين اليتيم / Madyan AL-Yatim, +967780647484, opens https://wa.me/967780647484.
+- **About → Developer** row: مدين اليتيم / Madyan AL-Yatim (since 1.3: Telegram only).
 - **Bug fixes**: rotation re-opened a notification's anime; Back with the drawer open left the screen; settings dialogs lost on rotation; keyboard search key waited for the debounce; Browse pull blanked results; load-more spinner during a pull; stale load-more page appended after switching season; overlapping schedule loads; O(n²) progress lookup in My List; wrong word order in Arabic strings containing Latin words.
 
 ### What's new in 1.1.1 (versionCode 3)

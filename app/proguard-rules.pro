@@ -13,3 +13,7 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# v1.3 Google sign-in (Credential Manager's Play-services provider is found by reflection)
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** { *; }

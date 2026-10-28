@@ -53,9 +53,9 @@ fun BarChart(bars: List<ChartSlice>, modifier: Modifier = Modifier, height: Dp =
     }
 }
 
-/** Donut chart + legend with counts and percentages. */
+/** Donut chart + legend with counts (and percentages where [showPercent]; v1.3 profile: counts only). */
 @Composable
-fun DonutChart(slices: List<ChartSlice>, modifier: Modifier = Modifier, size: Dp = 150.dp, centerText: String? = null) {
+fun DonutChart(slices: List<ChartSlice>, modifier: Modifier = Modifier, size: Dp = 150.dp, centerText: String? = null, showPercent: Boolean = true) {
     val total = slices.sumOf { it.value }.coerceAtLeast(1)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(size), contentAlignment = Alignment.Center) {
@@ -83,7 +83,7 @@ fun DonutChart(slices: List<ChartSlice>, modifier: Modifier = Modifier, size: Dp
                     Spacer(Modifier.width(8.dp))
                     Text(s.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${compactCount(s.value)} (${(s.value * 100f / total).toInt()}%)",
+                        if (showPercent) "${compactCount(s.value)} (${(s.value * 100f / total).toInt()}%)" else compactCount(s.value),
                         style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, maxLines = 1,
                         modifier = Modifier.padding(start = 6.dp),
                     )

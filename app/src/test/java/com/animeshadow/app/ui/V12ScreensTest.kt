@@ -156,6 +156,7 @@ class V12ScreensTest {
 
     @Test fun splash() {
         set { ShadowSplash(visible = true) }
+        compose.onNodeWithTag("splash_video").assertExists()
         compose.onNodeWithTag("shadow_splash").assertExists()
         shot("splash")
     }
@@ -194,35 +195,26 @@ class V12ScreensTest {
         compose.onNodeWithTag("ad_banner").assertDoesNotExist()
     }
 
-    @Test fun anilist_button_explains_calmly_when_not_activated() {
-        var opened = false
-        set { SettingsContent(Settings(), {}, SettingsActions(onLogin = { opened = true }), account = AniListAccount(configured = false)) }
-        compose.onNodeWithTag("anilist_login").performClick()
-        compose.waitForIdle()
-        compose.onNodeWithText(ctx.getString(R.string.anilist_not_active_title)).assertExists()
-        assertTrue(!opened)
-        shot("anilist_not_active")
+    @Test fun settings_has_no_account_section_any_more() {
+        // v1.3 item 1: the account moved to the Profile screen.
+        set { SettingsContent(Settings(), {}, SettingsActions(), account = AniListAccount(configured = true)) }
+        compose.onNodeWithTag("anilist_login").assertDoesNotExist()
+        compose.onNodeWithText(ctx.getString(R.string.settings_account)).assertDoesNotExist()
     }
 
-    @Test fun anilist_button_opens_login_when_configured() {
-        var opened = false
-        set { SettingsContent(Settings(), {}, SettingsActions(onLogin = { opened = true }), account = AniListAccount(configured = true)) }
-        compose.onNodeWithTag("anilist_login").performClick()
-        compose.waitForIdle()
-        assertTrue(opened)
-        compose.onNodeWithText(ctx.getString(R.string.anilist_not_active_title)).assertDoesNotExist()
-    }
-
-    @Test fun developer_row_opens_whatsapp() {
+    @Test fun developer_row_opens_telegram() {
         var taps = 0
         set { SettingsContent(Settings(), {}, SettingsActions(onDeveloper = { taps++ })) }
         compose.onNodeWithTag("settings_list").performScrollToNode(hasTestTag("developer_row"))
         compose.onNodeWithTag("developer_row").performClick()
         assertEquals(1, taps)
-        // The action the screen wires to it:
-        openUrl(ctx, ctx.getString(R.string.developer_whatsapp_url))
+        compose.onNodeWithText("\u2066@abnalyatim\u2069").assertExists()
+        compose.onNodeWithText("مدين اليتيم / Madyan AL-Yatim").assertExists()
+        // v1.3 item 9: Telegram only, no WhatsApp and no phone number anywhere.
+        compose.onNodeWithText("+967780647484", substring = true).assertDoesNotExist()
+        openUrl(ctx, ctx.getString(R.string.developer_telegram_url))
         val started: Intent = shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>()).nextStartedActivity
         assertEquals(Intent.ACTION_VIEW, started.action)
-        assertEquals("https://wa.me/967780647484", started.dataString)
+        assertEquals("https://t.me/abnalyatim", started.dataString)
     }
 }

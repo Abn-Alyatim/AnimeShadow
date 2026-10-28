@@ -15,6 +15,9 @@ import kotlinx.serialization.encodeToString
 
 enum class AppLanguage(val tag: String) { SYSTEM(""), ARABIC("ar"), ENGLISH("en") }
 
+/** v1.3: «أنمي | مانجا». Each mode has its own data (anime.db / manga.db); only this key says which one is showing. */
+enum class AppMode { ANIME, MANGA }
+
 data class Profile(
     val name: String = "",
     val handle: String = "",
@@ -48,7 +51,15 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val handle = stringPreferencesKey("profile_handle")
         val bio = stringPreferencesKey("profile_bio")
         val avatar = stringPreferencesKey("profile_avatar")
+        val mode = stringPreferencesKey("app_mode")
+        val mangaGrid = booleanPreferencesKey("manga_grid_mode")
     }
+
+    /** v1.3 mode switch (instant: a DataStore key, nothing is reloaded or deleted). */
+    val mode: Flow<AppMode> = store.data.map { p -> AppMode.entries.firstOrNull { it.name == p[Keys.mode] } ?: AppMode.ANIME }
+    suspend fun setMode(mode: AppMode) = store.edit { it[Keys.mode] = mode.name }
+    val mangaGrid: Flow<Boolean> = store.data.map { p -> p[Keys.mangaGrid] ?: true }
+    suspend fun setMangaGrid(grid: Boolean) = store.edit { it[Keys.mangaGrid] = grid }
 
     val settings: Flow<Settings> = store.data.map { p ->
         Settings(

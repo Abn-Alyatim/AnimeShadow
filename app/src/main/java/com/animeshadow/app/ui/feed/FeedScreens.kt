@@ -71,6 +71,7 @@ fun FeedContent(
         containerColor = Palette.Black,
         topBar = {
             AppTopBar(title, onMenu = onMenu) {
+                com.animeshadow.app.ui.LocalModeToggle.current?.invoke()
                 IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, stringResource(R.string.cd_search), tint = Palette.RefIcon) }
                 GridToggle(ui.grid, onToggleGrid)
             }

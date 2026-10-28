@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">ANIME SHADOW</string>
-    <string name="tagline" translatable="false">Your Anime. Your Journey.</string>
     <string name="nav_latest">اخر التحديثات</string>
     <string name="nav_browse">لائحة الانمي</string>
     <string name="nav_seasons">المواسم</string>

@@ -2,12 +2,14 @@ package com.animeshadow.app.ui
 
 import android.content.Intent
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -36,6 +38,8 @@ class AppSmokeTest {
     @Test fun every_drawer_destination_opens() {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForIdle()
+            compose.onNode(hasText(ctx.getString(R.string.mode_anime)) and hasClickAction()).performClick()
+            compose.waitForIdle()
             val labels = DrawerEntries.map { ctx.getString(it.label) }
             for (label in labels) {
                 compose.onNode(hasContentDescription(ctx.getString(R.string.cd_menu)) and hasClickAction()).performClick()
@@ -46,6 +50,42 @@ class AppSmokeTest {
                 compose.waitForIdle()
             }
             compose.onRoot().captureRoboImage("build/outputs/roborazzi/smoke_last_destination.png")
+        }
+    }
+
+    /** v1.3: the «أنمي | مانجا» toggle switches instantly; every manga drawer destination opens; anime keeps its place. */
+    @Test fun manga_mode_switch_and_every_manga_destination_opens() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.waitForIdle()
+            compose.onNode(hasText(ctx.getString(R.string.mode_manga)) and hasClickAction()).performClick()
+            compose.waitForIdle()
+            compose.mainClock.advanceTimeBy(600)
+            compose.waitForIdle()
+            compose.onNodeWithTag("kind_chips").assertExists()
+            for (label in MangaDrawerEntries.map { ctx.getString(it.label) }) {
+                compose.onNode(hasContentDescription(ctx.getString(R.string.cd_menu)) and hasClickAction()).performClick()
+                compose.waitForIdle()
+                compose.onNode(hasText(label) and hasClickAction() and !hasAnyAncestor(hasTestTag("mode_toggle")) and !hasAnyAncestor(hasTestTag("kind_chips")) and !hasTestTag("kind_manga")).performClick()
+                compose.waitForIdle()
+                compose.mainClock.advanceTimeBy(600)
+                compose.waitForIdle()
+                // The queue screen has a back arrow instead of the menu: go back to manga home.
+                if (compose.onAllNodes(hasContentDescription(ctx.getString(R.string.cd_menu)) and hasClickAction()).fetchSemanticsNodes().isEmpty()) {
+                    compose.onNode(hasContentDescription(ctx.getString(R.string.cd_back)) and hasClickAction()).performClick()
+                    compose.waitForIdle()
+                }
+            }
+            compose.onRoot().captureRoboImage("build/outputs/roborazzi/smoke_manga_last.png")
+            // Back to anime (and leave the stored mode as the other tests expect it).
+            compose.onNode(hasContentDescription(ctx.getString(R.string.cd_menu)) and hasClickAction()).performClick()
+            compose.waitForIdle()
+            compose.onNode(hasText(ctx.getString(R.string.manga_home)) and hasClickAction() and !hasAnyAncestor(hasTestTag("mode_toggle")) and !hasTestTag("kind_manga")).performClick()
+            compose.waitForIdle()
+            compose.onNode(hasText(ctx.getString(R.string.mode_anime)) and hasClickAction()).performClick()
+            compose.waitForIdle()
+            compose.mainClock.advanceTimeBy(600)
+            compose.waitForIdle()
+            compose.onNodeWithTag("kind_chips").assertDoesNotExist()
         }
     }
 

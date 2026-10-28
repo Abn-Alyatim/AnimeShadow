@@ -5,9 +5,6 @@
     <string name="settings_version">الإصدار</string>
     <string name="settings_developer">المطوّر</string>
     <string name="developer_name">مدين اليتيم / Madyan AL-Yatim</string>
-    <string name="developer_phone" translatable="false">+967780647484</string>
-    <string name="developer_whatsapp_url" translatable="false">https://wa.me/967780647484</string>
-    <string name="cd_whatsapp">مراسلة المطوّر على واتساب</string>
     <string name="no_app_to_open">لا يوجد تطبيق لفتح الرابط</string>
 
     <string name="settings_account">الحساب</string>

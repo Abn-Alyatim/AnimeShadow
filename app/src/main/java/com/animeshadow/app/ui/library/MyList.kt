@@ -37,12 +37,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -91,6 +93,8 @@ data class MyListUi(
     val grid: Boolean = true,
     val availableGenres: List<String> = emptyList(),
     val availableYears: List<Int> = emptyList(),
+    /** v1.3 swipe: every status page's items, so the neighbouring page is already there while you swipe. */
+    val byStatus: Map<WatchStatus, List<LibraryItem>> = emptyMap(),
 )
 
 @HiltViewModel
@@ -130,6 +134,7 @@ class MyListViewModel @Inject constructor(
             status = st,
             filter = f,
             items = f.apply(all, st),
+            byStatus = WatchStatus.entries.associateWith { f.apply(all, it) },
             counts = all.groupingBy { it.entry.status }.eachCount(),
             grid = s.gridMode,
             availableGenres = all.flatMap { it.anime?.genreList.orEmpty() }.distinct().sorted(),
@@ -177,7 +182,12 @@ fun MyListContent(
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             val tabs = WatchStatus.entries
-            val selected = tabs.indexOf(ui.status)
+            // v1.3 item 2: swipe left / right between the status pages.
+            val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = tabs.indexOf(ui.status).coerceAtLeast(0)) { tabs.size }
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            LaunchedEffect(pager.currentPage) { if (tabs[pager.currentPage] != ui.status) onStatus(tabs[pager.currentPage]) }
+            LaunchedEffect(ui.status) { val i = tabs.indexOf(ui.status); if (i >= 0 && i != pager.currentPage && !pager.isScrollInProgress) pager.scrollToPage(i) }
+            val selected = pager.currentPage
             ScrollableTabRow(
                 selectedTabIndex = selected,
                 containerColor = Palette.Black,
@@ -187,8 +197,8 @@ fun MyListContent(
             ) {
                 tabs.forEach { s ->
                     Tab(
-                        selected = s == ui.status,
-                        onClick = { onStatus(s) },
+                        selected = tabs.indexOf(s) == selected,
+                        onClick = { scope.launch { pager.animateScrollToPage(tabs.indexOf(s)) } },
                         selectedContentColor = Palette.Text,
                         unselectedContentColor = Palette.TextMuted,
                         text = {
@@ -215,24 +225,28 @@ fun MyListContent(
                     })
                 }
             }
-            // v1.2 speed: computed once per list change (v1.1 searched the whole list for every visible row).
-            val animeItems = remember(ui.items) { ui.items.mapNotNull { it.anime } }
-            val entries = remember(ui.items) { ui.items.associate { it.entry.animeId to it.entry } }
             Refreshable(refreshing, onRefresh, Modifier.weight(1f)) {
-            if (ui.items.isEmpty()) {
-                EmptyState(stringResource(R.string.empty_list))
-            } else {
-                AnimeGrid(
-                    items = animeItems,
-                    grid = ui.grid,
-                    onClick = onOpen,
-                    bottomBadge = { null },
-                    cornerBadge = { a -> a.seasonYear?.toString() },
-                    listAccent = { a ->
-                        entries[a.id]?.let { stringResource(R.string.progress_value, it.progress, a.episodes?.toString() ?: "?") }
-                    },
-                )
-            }
+                androidx.compose.foundation.pager.HorizontalPager(pager, Modifier.fillMaxSize().testTag("mylist_pager"), key = { it }) { page ->
+                    val status = tabs[page]
+                    val pageItems = ui.byStatus[status] ?: if (status == ui.status) ui.items else emptyList()
+                    // v1.2 speed: computed once per list change (v1.1 searched the whole list for every visible row).
+                    val animeItems = remember(pageItems) { pageItems.mapNotNull { it.anime } }
+                    val entries = remember(pageItems) { pageItems.associate { it.entry.animeId to it.entry } }
+                    if (pageItems.isEmpty()) {
+                        EmptyState(stringResource(R.string.empty_list))
+                    } else {
+                        AnimeGrid(
+                            items = animeItems,
+                            grid = ui.grid,
+                            onClick = onOpen,
+                            bottomBadge = { null },
+                            cornerBadge = { a -> a.seasonYear?.toString() },
+                            listAccent = { a ->
+                                entries[a.id]?.let { stringResource(R.string.progress_value, it.progress, a.episodes?.toString() ?: "?") }
+                            },
+                        )
+                    }
+                }
             }
         }
     }

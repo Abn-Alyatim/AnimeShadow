@@ -30,6 +30,12 @@ val localProps = Properties().apply {
 val aniListClientId: String = ((project.findProperty("anilistClientId") as String?) ?: localProps.getProperty("anilist.clientId") ?: "").trim()
 // v1.2: Google's TEST ad units only (never real ones in this build). -PadsEnabled=false removes the banner.
 val adsEnabled: Boolean = ((project.findProperty("adsEnabled") as String?) ?: "true").toBoolean()
+// v1.3: Google sign-in (Credential Manager). The Web client ID of Madyan's Google Cloud project (public, not a secret).
+// It only works once that project also has an Android OAuth client for com.animeshadow.app + the signing SHA-1
+// (76:29:9F:69:58:16:51:2D:43:E7:F0:DF:6D:1E:45:6C:11:D9:B2:BF) — see GOOGLE_LOGIN_AR.md. Override: -PgoogleWebClientId=… or
+// google.webClientId=… in local.properties; -PgoogleWebClientId= (empty) builds the login as «not activated».
+val googleWebClientId: String = ((project.findProperty("googleWebClientId") as String?) ?: localProps.getProperty("google.webClientId")
+    ?: "674853191136-m6gc2oct6agk6bbm8kga5muvdco96ro3.apps.googleusercontent.com").trim()
 val myMemoryEmail: String = (project.findProperty("mymemoryEmail") as String?) ?: localProps.getProperty("mymemory.email") ?: ""
 
 android {
@@ -40,14 +46,15 @@ android {
         applicationId = "com.animeshadow.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("String", "MYMEMORY_EMAIL", "\"${myMemoryEmail.replace("\"", "")}\"")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"${aniListClientId.filter { it.isDigit() }}\"")
         buildConfigField("String", "ANILIST_REDIRECT", "\"animeshadow://anilist-auth\"")
         buildConfigField("boolean", "ADS_ENABLED", adsEnabled.toString())
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${googleWebClientId.replace("\"", "")}\"")
         buildConfigField("String", "ADS_BANNER_UNIT", "\"ca-app-pub-3940256099942544/9214589741\"")
         manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
     }
@@ -154,6 +161,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.play.services.ads)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

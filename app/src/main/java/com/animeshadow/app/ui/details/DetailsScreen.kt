@@ -222,7 +222,9 @@ private enum class EpFilter { ALL, WATCHED, UNWATCHED }
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DetailsContent(ui: DetailsUi, actions: DetailsActions, initialTab: Int = 0) {
-    var tab by rememberSaveable { mutableIntStateOf(initialTab) }
+    // v1.3 item 2: the tabs are pages you can swipe between (details ↔ episodes ↔ stats ↔ characters).
+    val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = initialTab) { 4 }
+    val tab = pager.currentPage
     var epFilter by rememberSaveable { mutableStateOf(EpFilter.ALL) }
     var newestFirst by rememberSaveable { mutableStateOf(true) }
     var showMore by remember { mutableStateOf(false) }
@@ -308,7 +310,7 @@ fun DetailsContent(ui: DetailsUi, actions: DetailsActions, initialTab: Int = 0) 
         Column(Modifier.padding(pad).fillMaxSize()) {
             val tabs = listOf(R.string.tab_details, R.string.tab_episodes, R.string.tab_stats, R.string.tab_characters)
             // Ref 11: tabs start at the LEFT, sized to their text (the 4th is cut at the right edge), short white underline.
-            RefTabs(tabs.map { stringResource(it) }, tab) { tab = it }
+            RefTabs(tabs.map { stringResource(it) }, tab) { scope.launch { pager.animateScrollToPage(it) } }
             (ui.refresh as? Refresh.Failed)?.let {
                 StatusBanner(if (it.offline) stringResource(R.string.offline_cached) else stringResource(R.string.load_failed))
             }
@@ -317,11 +319,20 @@ fun DetailsContent(ui: DetailsUi, actions: DetailsActions, initialTab: Int = 0) 
                 if (ui.refresh is Refresh.Failed) EmptyState(stringResource(R.string.empty_feed)) else LoadingBox()
                 return@Column
             }
-            when (tab) {
-                0 -> InfoTab(ui, anime, actions)
-                1 -> EpisodesTab(ui, anime, actions, epFilter, newestFirst, onComments = showSoon)
-                2 -> StatsTab(anime)
-                else -> CharactersTab(ui, actions)
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pager,
+                modifier = Modifier.fillMaxSize().testTag("details_pager"),
+                beyondViewportPageCount = 1,
+                key = { it },
+            ) { page ->
+                Box(Modifier.fillMaxSize()) {
+                    when (page) {
+                        0 -> InfoTab(ui, anime, actions)
+                        1 -> EpisodesTab(ui, anime, actions, epFilter, newestFirst, onComments = showSoon)
+                        2 -> StatsTab(anime)
+                        else -> CharactersTab(ui, actions)
+                    }
+                }
             }
         }
     }

@@ -29,8 +29,13 @@ hiltWork = "1.2.0"
 datastore = "1.1.1"
 profileinstaller = "1.3.1"
 playServicesAds = "23.6.0"
+credentials = "1.3.0"
+googleId = "1.1.1"
 
 [libraries]
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleId" }
 play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }

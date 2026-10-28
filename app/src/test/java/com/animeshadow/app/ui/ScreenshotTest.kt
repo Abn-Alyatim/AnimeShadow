@@ -160,7 +160,7 @@ abstract class ScreensBase(private val suffix: String, private val expected: Lay
     }
     @Test @Config(qualifiers = "+h1300dp") fun s20_stats_profile() = shot("20_stats_profile") {
         val lib = Fixtures.library
-        ProfileContent(ProfileUi(Profile("Madyan", "madyan", "Your Anime. Your Journey."), StatsCalculator.compute(lib, 24), 6, Fixtures.detail), {}, {}, {})
+        ProfileContent(ProfileUi(Profile("Madyan", "madyan", ""), StatsCalculator.compute(lib, 24), 6, Fixtures.detail), {}, {})
     }
     @Test @Config(qualifiers = "+h1400dp") fun s21_settings() = shot("21_settings") { SettingsContent(Settings(notifications = true), {}, SettingsActions()) }
 

@@ -22,6 +22,7 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
     @Inject lateinit var auth: AniListAuthRepository
     private val openAnime = mutableStateOf<Int?>(null)
+    private val openDownloads = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,7 +32,10 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) handle(intent)
         setContent {
             AnimeShadowTheme {
-                AppRoot(openAnimeId = openAnime.value, onOpened = { openAnime.value = null })
+                AppRoot(
+                    openAnimeId = openAnime.value, onOpened = { openAnime.value = null },
+                    openDownloads = openDownloads.value, onDownloadsOpened = { openDownloads.value = false },
+                )
             }
         }
         // v1.2 ads: the SDK starts on a background thread after the first screen is up.
@@ -54,11 +58,17 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
+        if (intent.getBooleanExtra(EXTRA_OPEN_DOWNLOADS, false)) {
+            openDownloads.value = true
+            intent.removeExtra(EXTRA_OPEN_DOWNLOADS)
+            return
+        }
         openAnime.value = intent.getIntExtra(EXTRA_ANIME_ID, 0).takeIf { it > 0 }
         intent.removeExtra(EXTRA_ANIME_ID)
     }
 
     companion object {
         const val EXTRA_ANIME_ID = "anime_id"
+        const val EXTRA_OPEN_DOWNLOADS = "open_manga_downloads"
     }
 }
