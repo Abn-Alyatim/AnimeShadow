@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -51,6 +52,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +64,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -170,14 +173,28 @@ object Routes {
     fun mGenre(name: String) = "m_genre/" + android.net.Uri.encode(name)
     const val M_READER = "m_reader/{id}/{key}"
     fun mReader(id: Int, key: String) = "m_reader/$id/" + android.net.Uri.encode(key)
+
+    // v1.4.0
+    const val CATEGORIES = "categories"
+    const val M_CATEGORIES = "m_categories"
+    /** «شادو سينباي»: history list, one conversation, customisation (in both modes). */
+    const val CHAT = "chat"
+    const val CHAT_CONV = "chat/c/{id}"
+    fun chatConv(id: String) = "chat/c/" + android.net.Uri.encode(id)
+    const val CHAT_SETTINGS = "chat/settings"
+    fun tag(name: String) = "genre/" + android.net.Uri.encode(com.animeshadow.app.domain.BrowseQuery.TAG_PREFIX + name)
+    fun mTag(name: String) = "m_genre/" + android.net.Uri.encode(com.animeshadow.app.domain.BrowseQuery.TAG_PREFIX + name)
 }
 
-data class DrawerEntry(val route: String, @StringRes val label: Int, val icon: ImageVector, val dividerBefore: Boolean = false)
+/** [avatar]: v1.4.0 «شادو سينباي» row shows the assistant's round picture instead of an icon. */
+data class DrawerEntry(val route: String, @StringRes val label: Int, val icon: ImageVector, val dividerBefore: Boolean = false, val avatar: Boolean = false)
 
 val DrawerEntries = listOf(
     DrawerEntry(Routes.LATEST, R.string.nav_latest, Icons.Filled.LocalFireDepartment),
     DrawerEntry(Routes.BROWSE, R.string.nav_browse, Icons.AutoMirrored.Filled.List),
+    DrawerEntry(Routes.CATEGORIES, R.string.nav_categories, Icons.Filled.Category),
     DrawerEntry(Routes.SEASONS, R.string.nav_seasons, Icons.Filled.ViewModule),
+    DrawerEntry(Routes.CHAT, R.string.nav_senpai, Icons.Filled.Person, dividerBefore = true, avatar = true),
     DrawerEntry(Routes.TOP, R.string.nav_top, Icons.Filled.Star, dividerBefore = true),
     DrawerEntry(Routes.MYLIST, R.string.nav_mylist, Icons.Filled.Bookmarks, dividerBefore = true),
     DrawerEntry(Routes.FAV_ANIME, R.string.nav_fav_anime, Icons.Filled.Favorite),
@@ -194,6 +211,8 @@ val DrawerEntries = listOf(
 val MangaDrawerEntries = listOf(
     DrawerEntry(Routes.M_HOME, R.string.manga_home, Icons.Filled.AutoStories),
     DrawerEntry(Routes.M_SEARCH, R.string.manga_browse, Icons.AutoMirrored.Filled.List),
+    DrawerEntry(Routes.M_CATEGORIES, R.string.nav_categories, Icons.Filled.Category),
+    DrawerEntry(Routes.CHAT, R.string.nav_senpai, Icons.Filled.Person, dividerBefore = true, avatar = true),
     DrawerEntry(Routes.M_LIBRARY, R.string.nav_mylist, Icons.Filled.Bookmarks, dividerBefore = true),
     DrawerEntry(Routes.M_FAVORITES, R.string.manga_favorites, Icons.Filled.Favorite),
     DrawerEntry(Routes.M_HISTORY, R.string.manga_history, Icons.Filled.History),
@@ -283,6 +302,10 @@ fun ModeToggle(mode: AppMode, onMode: (AppMode) -> Unit, modifier: Modifier = Mo
     }
 }
 
+/** v1.4.0 (Madyan): a slightly narrower drawer (1.3.1: 300 dp) with a smaller menu font (1.3.1: bodyLarge 16 sp). */
+val DRAWER_WIDTH = 280.dp
+val DRAWER_FONT = 14.5.sp
+
 @Composable
 fun DrawerContent(
     current: String?,
@@ -293,10 +316,10 @@ fun DrawerContent(
     accountName: String = "",
 ) {
     // v1.3 item 3: the drawer is pure black (#000) like the lists, not the grey surface.
-    ModalDrawerSheet(drawerContainerColor = Palette.Black, modifier = Modifier.width(300.dp).testTag("drawer_sheet")) {
+    ModalDrawerSheet(drawerContainerColor = Palette.Black, modifier = Modifier.width(DRAWER_WIDTH).testTag("drawer_sheet")) {
         Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().clickable { onSelect(Routes.STATS) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                val m = Modifier.size(56.dp).clip(CircleShape).border(2.dp, Palette.Accent, CircleShape)
+                val m = Modifier.size(56.dp).clip(CircleShape).border(2.dp, Palette.DrawerAccent, CircleShape)
                 if (profile.avatarPath != null) AsyncImage(File(profile.avatarPath), null, m, contentScale = ContentScale.Crop)
                 else Image(painterResource(R.drawable.as_logo), null, m.background(Palette.Black), contentScale = ContentScale.Crop)
                 Spacer(Modifier.width(12.dp))
@@ -318,13 +341,14 @@ fun DrawerContent(
             entries.forEach { e ->
                 if (e.dividerBefore) HorizontalDivider(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), color = Palette.Divider)
                 NavigationDrawerItem(
-                    label = { Text(stringResource(e.label), style = MaterialTheme.typography.bodyLarge) },
-                    icon = { Icon(e.icon, null) },
+                    // v1.4.0 (Madyan): smaller menu font
+                    label = { Text(stringResource(e.label), style = MaterialTheme.typography.bodyLarge.copy(fontSize = DRAWER_FONT)) },
+                    icon = { if (e.avatar) com.animeshadow.app.chat.SenpaiAvatar(26) else Icon(e.icon, null) },
                     selected = current == e.route,
                     onClick = { onSelect(e.route) },
                     colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Palette.AccentSoft,
-                        selectedIconColor = Palette.Accent,
+                        selectedContainerColor = Palette.DrawerAccentSoft,
+                        selectedIconColor = Palette.DrawerAccent,
                         selectedTextColor = Palette.Text,
                         unselectedContainerColor = Palette.Black,
                         unselectedIconColor = Palette.RefIcon,
@@ -371,6 +395,23 @@ fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, openDownloads: 
         }
     }
 
+    // v1.4.0: a chat card opens its page; a card of the other kind switches mode first, then opens there.
+    var pendingCard by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.animeshadow.app.chat.ChatCard?>(null) }
+    val openCard: (com.animeshadow.app.chat.ChatCard) -> Unit = { c ->
+        val want = if (c.isManga) AppMode.MANGA else AppMode.ANIME
+        if (want == mode) runCatching { nav.navigate(if (c.isManga) Routes.mTitle(c.id) else Routes.anime(c.id)) }
+        else { pendingCard = c; vm.setMode(want) }
+    }
+    LaunchedEffect(mode, pendingCard) {
+        val c = pendingCard ?: return@LaunchedEffect
+        if ((if (c.isManga) AppMode.MANGA else AppMode.ANIME) != mode) return@LaunchedEffect
+        androidx.compose.runtime.withFrameNanos { }
+        runCatching { nav.navigate(if (c.isManga) Routes.mTitle(c.id) else Routes.anime(c.id)) }
+        pendingCard = null
+    }
+    // v1.4.0 AdMob: at most one interstitial every few screens (never splash / login / reader / chat), see Interstitials.
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    LaunchedEffect(current) { if (current != null) com.animeshadow.app.ui.ads.Interstitials.onScreen(activity, current) }
     val openMenu: () -> Unit = { scope.launch { drawer.open() } }
     // v1.2 bug fix: Back with the drawer open closed the screen (or left the app) instead of closing the drawer.
     androidx.activity.compose.BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
@@ -395,9 +436,11 @@ fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, openDownloads: 
             // Each mode keeps its own back stack, screens and scroll positions; switching only changes which one shows.
             // (Until the stored mode is read — a few ms, under the splash — the anime side shows.)
             holder.SaveableStateProvider(mode.name) {
+                CompositionLocalProvider(LocalOpenChatCard provides openCard) {
                 when (mode) {
                     AppMode.ANIME -> AppNavHost(animeNav, openMenu, drawer, toggle)
                     AppMode.MANGA -> MangaNavGraph(mangaNav, openMenu, toggle)
+                }
                 }
             }
         }
@@ -424,7 +467,8 @@ fun ShadowSplash(visible: Boolean) {
                 .testTag("shadow_splash"),
             contentAlignment = Alignment.Center,
         ) {
-            com.animeshadow.app.ui.common.SplashVideo(Modifier.fillMaxWidth(), loop = false)
+            // v1.4.0: the small animated Shadow icon, centred (replaces the full-width video).
+            Box(Modifier.testTag("shadow_icon")) { com.animeshadow.app.ui.common.ShadowLoop(Modifier.width(150.dp)) }
         }
     }
 }
@@ -436,7 +480,18 @@ fun androidx.navigation.NavGraphBuilder.sharedScreens(nav: NavHostController, op
     composable(Routes.LOGIN) { LoginScreen({ nav.popBackStack() }) }
     composable(Routes.SETTINGS) { SettingsScreen(openMenu) }
     composable(Routes.NOTIFICATIONS) { NotificationsScreen({ nav.popBackStack() }, openAnime) }
+    // v1.4.0 «شادو سينباي»
+    composable(Routes.CHAT) {
+        com.animeshadow.app.chat.ChatHomeScreen(openMenu, onOpen = { nav.navigate(Routes.chatConv(it)) }, onNew = { nav.navigate(Routes.chatConv("new")) }, onSettings = { nav.navigate(Routes.CHAT_SETTINGS) })
+    }
+    composable(Routes.CHAT_CONV, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
+        com.animeshadow.app.chat.ChatScreen({ nav.popBackStack() }, onOpenCard = LocalOpenChatCard.current)
+    }
+    composable(Routes.CHAT_SETTINGS) { com.animeshadow.app.chat.ChatSettingsScreen({ nav.popBackStack() }) }
 }
+
+/** v1.4.0: opens a chat card's anime/manga page, switching mode first when the card is of the other kind. */
+val LocalOpenChatCard = staticCompositionLocalOf<(com.animeshadow.app.chat.ChatCard) -> Unit> { {} }
 
 @Composable
 private fun AppNavHost(nav: NavHostController, openMenu: () -> Unit, @Suppress("UNUSED_PARAMETER") drawer: DrawerState, toggle: @Composable () -> Unit) {
@@ -447,6 +502,9 @@ private fun AppNavHost(nav: NavHostController, openMenu: () -> Unit, @Suppress("
     NavHost(nav, startDestination = Routes.LATEST) {
         composable(Routes.LATEST) { CompositionLocalProvider(LocalModeToggle provides toggle) { HomeScreen(openMenu, search, open) } }
         composable(Routes.BROWSE) { BrowseScreen(autoFocus = false, onMenu = openMenu, onBack = null, onOpen = open) }
+        composable(Routes.CATEGORIES) {
+            com.animeshadow.app.ui.browse.CategoriesScreen(openMenu, null, manga = false, onGenre = { nav.navigate(Routes.genre(it)) }, onTag = { nav.navigate(Routes.tag(it)) })
+        }
         composable(Routes.SEARCH) { BrowseScreen(autoFocus = true, onMenu = openMenu, onBack = { nav.popBackStack() }, onOpen = open) }
         composable(Routes.SEASONS) { SeasonsScreen(openMenu, search, open) }
         composable(Routes.TOP) { TopScreen(openMenu, search, open) }

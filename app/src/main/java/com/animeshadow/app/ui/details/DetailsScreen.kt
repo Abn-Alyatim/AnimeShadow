@@ -419,6 +419,8 @@ private fun InfoTab(ui: DetailsUi, a: AnimeEntity, actions: DetailsActions) {
                 }
             }
         }
+        // v1.4.0 «شاهد»: official free episodes (YouTube channels like Muse Asia / Ani-One) + official platforms, from AniList.
+        item(key = "watch") { com.animeshadow.app.ui.watch.WatchSection(a.id, modifier = Modifier.padding(horizontal = 16.dp), showTrailer = false) }
         if (ui.relations.isNotEmpty()) item(key = "related") {
             AnimeRow(stringResource(R.string.related), ui.relations.map { it.anime to relationLabel(it.relationType) }, actions.onOpenAnime)
         }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +48,7 @@ import com.animeshadow.app.data.auth.GoogleAccountRepository
 import com.animeshadow.app.data.auth.GoogleSignInResult
 import com.animeshadow.app.data.auth.GoogleSignInSource
 import com.animeshadow.app.ui.common.AppTopBar
-import com.animeshadow.app.ui.common.SplashVideo
+import com.animeshadow.app.ui.common.ShadowLoop
 import com.animeshadow.app.ui.profile.GoogleG
 import com.animeshadow.app.ui.theme.Palette
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -102,7 +103,7 @@ fun LoginContent(onBack: () -> Unit, onGoogle: () -> Unit, busy: Boolean = false
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(28.dp))
-            SplashVideo(Modifier.fillMaxWidth())
+            Box(Modifier.testTag("shadow_icon")) { ShadowLoop(Modifier.width(132.dp)) }
             Spacer(Modifier.height(14.dp))
             Text(
                 stringResource(R.string.app_name), color = Color.White, fontWeight = FontWeight.Bold,

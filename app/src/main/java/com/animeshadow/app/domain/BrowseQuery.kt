@@ -22,13 +22,21 @@ data class BrowseQuery(
     val genre: String? = null,
     /** Age filter (v1.1): false = hide 18+ (default, as v1.0), true = 18+ only, null = everything. AniList isAdult. */
     val adult: Boolean? = false,
+    /** v1.4.0: one AniList tag (e.g. "Isekai", "Time Travel"). */
+    val tag: String? = null,
 ) {
     val feedKey: String
-        get() = listOf("browse", search.trim().lowercase(), sort.name, status, format, season, year, genre, adult).joinToString("|")
+        get() = listOf("browse", search.trim().lowercase(), sort.name, status, format, season, year, genre, adult, tag).joinToString("|")
 
-    val activeFilterCount: Int get() = listOfNotNull(status, format, season, year, genre).size + (if (adult != false) 1 else 0)
+    val activeFilterCount: Int get() = listOfNotNull(status, format, season, year, genre, tag).size + (if (adult != false) 1 else 0)
 
     companion object {
+        /** v1.4.0: a "genre" route argument starting with this opens a TAG list instead of a genre list. */
+        const val TAG_PREFIX = "tag:"
+        /** genre/tag route argument → query (genre "Action" or tag "tag:Isekai"). Adult names only when [adult] is on. */
+        fun forGenreArg(arg: String, adult: Boolean): BrowseQuery =
+            if (arg.startsWith(TAG_PREFIX)) BrowseQuery(tag = arg.removePrefix(TAG_PREFIX), adult = if (adult) null else false)
+            else BrowseQuery(genre = arg, adult = if (adult) null else false)
         val SEASONS = listOf("WINTER", "SPRING", "SUMMER", "FALL")
         val GENRES = listOf(
             "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Horror", "Mahou Shoujo", "Mecha", "Music",

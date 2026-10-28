@@ -139,7 +139,7 @@ class V11ViewModelTest {
     }
 
     @Test fun genre_screen_asks_anilist_for_that_genre() {
-        val vm = GenreViewModel(SavedStateHandle(mapOf("name" to "Adventure")), repo, settings)
+        val vm = GenreViewModel(SavedStateHandle(mapOf("name" to "Adventure")), repo, settings, com.animeshadow.app.data.settings.ExtraPrefs(PreferenceDataStoreFactory.create(scope = scope) { tmp.root.resolve("x.preferences_pb") }))
         waitFor { vm.ui.value.items.isNotEmpty() }
         assertTrue(bodies.any { it.contains("\"genre\":\"Adventure\"") })
         assertTrue(bodies.any { it.contains("\"adult\":false") })

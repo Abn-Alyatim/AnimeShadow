@@ -156,7 +156,7 @@ class V12ScreensTest {
 
     @Test fun splash() {
         set { ShadowSplash(visible = true) }
-        compose.onNodeWithTag("splash_video").assertExists()
+        compose.onNodeWithTag("shadow_icon").assertExists() // v1.4.0: small animated icon instead of the video
         compose.onNodeWithTag("shadow_splash").assertExists()
         shot("splash")
     }

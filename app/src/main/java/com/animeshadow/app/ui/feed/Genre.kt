@@ -56,6 +56,7 @@ class GenreViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val repo: AnimeRepository,
     private val settings: SettingsRepository,
+    private val extra: com.animeshadow.app.data.settings.ExtraPrefs,
 ) : ViewModel() {
     private val genre: String = checkNotNull(savedState.get<String>("name"))
     private val _ui = MutableStateFlow(GenreUi(genre = genre))
@@ -83,7 +84,7 @@ class GenreViewModel @Inject constructor(
         job = viewModelScope.launch {
             val page = if (reset) 1 else _ui.value.page + 1
             _ui.update { it.copy(loading = true, error = null, refreshing = pull) }
-            repo.browse(BrowseQuery(genre = genre), page).fold(
+            repo.browse(BrowseQuery.forGenreArg(genre, extra.adultNow()), page).fold(
                 { r ->
                     _ui.update {
                         it.copy(

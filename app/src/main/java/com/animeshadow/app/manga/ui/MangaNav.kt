@@ -21,6 +21,9 @@ fun MangaNavGraph(nav: NavHostController, openMenu: () -> Unit, toggle: @Composa
     NavHost(nav, startDestination = Routes.M_HOME) {
         composable(Routes.M_HOME) { MangaHomeScreen(openMenu, { nav.navigate(Routes.M_SEARCH) }, openTitle, openGenre, toggle) }
         composable(Routes.M_SEARCH) { MangaSearchScreen(onBack = null, onMenu = openMenu, onOpen = openTitle) }
+        composable(Routes.M_CATEGORIES) {
+            com.animeshadow.app.ui.browse.CategoriesScreen(openMenu, null, manga = true, onGenre = openGenre, onTag = { nav.navigate(Routes.mTag(it)) })
+        }
         composable(Routes.M_GENRE, arguments = listOf(navArgument("name") { type = NavType.StringType })) {
             MangaSearchScreen(onBack = { nav.popBackStack() }, onMenu = openMenu, onOpen = openTitle)
         }

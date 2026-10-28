@@ -46,9 +46,9 @@ class MangaRepository(
     }
 
     /** Search or genre list (not cached as a feed; the cards are cached for offline details). */
-    suspend fun search(query: String?, genre: String?, kind: MangaKind?, page: Int = 1): Pair<List<MangaEntity>, Boolean> {
+    suspend fun search(query: String?, genre: String?, kind: MangaKind?, page: Int = 1, tag: String? = null, adult: Boolean = false): Pair<List<MangaEntity>, Boolean> {
         val sort = if (!query.isNullOrBlank()) "SEARCH_MATCH" else "POPULARITY_DESC"
-        val r = api.page(MangaQueries.page(page, sort, kind?.countries?.first(), genre, query))
+        val r = api.page(MangaQueries.page(page, sort, kind?.countries?.first(), genre, query, tag = tag, adult = if (adult) null else false))
         r.errors?.firstOrNull()?.let { throw IOException(it.message ?: "AniList error") }
         val items = r.data?.page?.media.orEmpty().map { it.toEntity(clock.now(), detail = false) }
         dao.upsertKeepingDetails(items)

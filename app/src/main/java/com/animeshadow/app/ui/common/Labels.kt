@@ -113,7 +113,8 @@ fun compactCount(n: Int): String = when {
     else -> null
 }
 
-@Composable fun genreLabel(genre: String): String = label(genreRes(genre), genre)
+@Composable fun genreLabel(genre: String): String = genreRes(genre)?.let { stringResource(it) }
+    ?: com.animeshadow.app.domain.AniTags.ar(genre.removePrefix(com.animeshadow.app.domain.BrowseQuery.TAG_PREFIX))
 
 /** "1,562,923" (Western digits, thousands separators) as the reference rating row shows counts. */
 fun groupedCount(n: Int): String = String.format(Locale.US, "%,d", n)

@@ -42,6 +42,9 @@ object Palette {
     /** v1.3.1 (Madyan): EVERY icon is bright white #FFFFFF at full alpha, like his reference drawer (1.3.0: grey #BDBDBD). */
     val RefIcon = Color(0xFFFFFFFF)
     val Chip = Color(0xFF262626)
+    /** v1.4.0 (Madyan): a softer, less saturated purple for the drawer's selected row and avatar ring. */
+    val DrawerAccent = Color(0xFF9D92CF)
+    val DrawerAccentSoft = Color(0x249D92CF)
 }
 
 /**

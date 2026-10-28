@@ -182,7 +182,7 @@ class V13ScreensTest {
     @Test fun after_login() {
         var taps = 0
         set(0) { LoginContent({}, { taps++ }) }
-        compose.onNodeWithTag("splash_video").assertExists()
+        compose.onNodeWithTag("shadow_icon").assertExists()
         compose.onNodeWithText(ctx.getString(R.string.app_name)).assertExists()
         compose.onNodeWithTag("google_button").performClick()
         assertEquals(1, taps)
@@ -191,7 +191,7 @@ class V13ScreensTest {
 
     @Test fun after_splash() {
         set(0) { ShadowSplash(visible = true) }
-        compose.onNodeWithTag("splash_video").assertExists()
+        compose.onNodeWithTag("shadow_icon").assertExists()
         shot("after_splash")
     }
 

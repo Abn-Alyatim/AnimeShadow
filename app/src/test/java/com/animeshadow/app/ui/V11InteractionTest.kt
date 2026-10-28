@@ -281,7 +281,8 @@ class V11InteractionTest {
     // ---------- item 10: age filter in search ----------
     @Test fun age_filter_in_the_filter_sheet() {
         var applied: BrowseQuery? = null
-        set { FilterSheet(BrowseQuery(), { applied = it }, {}) }
+        // v1.4.0: the age filter only appears when «محتوى +18» is on in Settings
+        set { FilterSheet(BrowseQuery(), { applied = it }, {}, adultAllowed = true) }
         compose.onNodeWithText(s(R.string.filter_age)).assertExists()
         compose.onNodeWithTag("age_true").performScrollTo().performClick()
         compose.onNodeWithText(s(R.string.apply)).performScrollTo().performClick()

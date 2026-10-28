@@ -220,20 +220,20 @@ class V131Test {
     // ------------------------------------------------------------------ clip + loader
 
     @Test fun clip_is_the_new_seamless_aspect_and_loader_always_draws_its_still() {
-        assertEquals(1056f / 720f, com.animeshadow.app.ui.common.SHADOW_CLIP_ASPECT, 0.0001f)
+        // v1.4.0: the clip became a square animated icon
+        assertEquals(1f, com.animeshadow.app.ui.common.SHADOW_CLIP_ASPECT, 0.0001f)
         set { LoadingBox() }
         compose.onNodeWithTag("shadow_loop").assertExists()
         compose.onNodeWithTag("shadow_still", useUnmergedTree = true).assertExists()
         val b = compose.onNodeWithTag("shadow_loop").fetchSemanticsNode().boundsInRoot
-        assertEquals(1056f / 720f, b.width / b.height, 0.02f)
+        assertEquals(1f, b.width / b.height, 0.02f)
     }
 
     @Test fun manga_loader_uses_the_same_clip_as_the_splash() {
-        // The loader frame and the splash poster are cut from the same (new) clip: same first frame, scaled.
+        // v1.4.0: splash, login and loaders all draw the same square Shadow icon (its still = first frame, with alpha).
         val still = android.graphics.BitmapFactory.decodeResource(ctx.resources, R.drawable.shadow_still)
-        val poster = android.graphics.BitmapFactory.decodeResource(ctx.resources, R.drawable.splash_poster)
-        assertEquals(528, still.width); assertEquals(360, still.height)
-        assertEquals(1056, poster.width); assertEquals(720, poster.height)
+        assertEquals(360, still.width); assertEquals(360, still.height)
+        assertTrue(still.hasAlpha())
     }
 
     // ------------------------------------------------------------------ manga details = anime details (Madyan 5:04–5:07)

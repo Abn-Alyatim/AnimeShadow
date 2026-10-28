@@ -194,7 +194,7 @@ class AnimeRepository(
                     "page" to page, "search" to query.search.trim().ifBlank { null },
                     "sort" to listOf(if (query.search.isNotBlank() && query.sort == com.animeshadow.app.domain.BrowseSort.POPULARITY) "SEARCH_MATCH" else query.sort.anilist),
                     "status" to query.status, "format" to query.format, "season" to query.season,
-                    "year" to query.year, "genre" to query.genre, "adult" to query.adult,
+                    "year" to query.year, "genre" to query.genre, "tag" to query.tag, "adult" to query.adult,
                 ),
             )
             PageResult(storeCards(p.media), p.pageInfo?.hasNextPage ?: false, fromCache = false)
@@ -204,7 +204,7 @@ class AnimeRepository(
         val filtered = local.filter { a ->
             (query.status == null || a.status == query.status) && (query.format == null || a.format == query.format) &&
                 (query.season == null || a.season == query.season) && (query.year == null || a.seasonYear == query.year) &&
-                (query.genre == null || query.genre in a.genreList) && (query.adult == null || a.isAdult == query.adult)
+                query.tag == null && (query.genre == null || query.genre in a.genreList) && (query.adult == null || a.isAdult == query.adult)
         }
         return Result.success(PageResult(filtered, hasNext = false, fromCache = true))
     }

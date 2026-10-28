@@ -19,9 +19,9 @@ object AniListQueries {
         "airingSchedules(airingAt_greater:\$from,airingAt_lesser:\$to,sort:TIME){episode airingAt media{$CARD isAdult}}}}"
 
     const val BROWSE = "query(\$page:Int,\$search:String,\$sort:[MediaSort],\$status:MediaStatus,\$format:MediaFormat," +
-        "\$season:MediaSeason,\$year:Int,\$genre:String,\$adult:Boolean){Page(page:\$page,perPage:30){pageInfo{hasNextPage} " +
+        "\$season:MediaSeason,\$year:Int,\$genre:String,\$tag:String,\$adult:Boolean){Page(page:\$page,perPage:30){pageInfo{hasNextPage} " +
         "media(type:ANIME,isAdult:\$adult,search:\$search,sort:\$sort,status:\$status,format:\$format,season:\$season," +
-        "seasonYear:\$year,genre:\$genre){$CARD $LIST_EXTRA}}}"
+        "seasonYear:\$year,genre:\$genre,tag:\$tag){$CARD $LIST_EXTRA}}}"
 
     const val BY_IDS = "query(\$ids:[Int]){Page(page:1,perPage:50){media(type:ANIME,id_in:\$ids){$CARD $LIST_EXTRA}}}"
 

@@ -97,8 +97,13 @@ class SettingsViewModel @Inject constructor(
     private val clock: Clock,
     @ApplicationContext private val context: Context,
     private val auth: AniListAuthRepository,
+    private val extra: com.animeshadow.app.data.settings.ExtraPrefs,
 ) : ViewModel() {
     val ui: StateFlow<Settings> = settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
+    /** v1.4.0 «محتوى +18» (off by default; first switch-on asks "I am 18+"). */
+    val adult: StateFlow<Boolean> = extra.adult.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val adultConfirmed: StateFlow<Boolean> = extra.adultConfirmed.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setAdult(on: Boolean, confirmed18: Boolean = false) = viewModelScope.launch { extra.setAdult(on, confirmed18) }
     val account: StateFlow<AniListAccount> = auth.account
     fun loginUrl(): String? = auth.authorizeUrl()
     fun logout() = auth.logout()
@@ -166,6 +171,9 @@ fun SettingsContent(
     actions: SettingsActions,
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
     account: AniListAccount = AniListAccount(configured = BuildConfig.ANILIST_CLIENT_ID.isNotBlank()),
+    adult: Boolean = false,
+    adultConfirmed: Boolean = false,
+    onAdult: (on: Boolean, confirmed18: Boolean) -> Unit = { _, _ -> },
 ) {
     var dialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     Scaffold(
@@ -179,6 +187,16 @@ fun SettingsContent(
             item { SwitchRow(stringResource(R.string.settings_notify_all), stringResource(R.string.settings_notify_all_sub), s.notifications, actions.onNotifications) }
             item { SwitchRow(stringResource(R.string.settings_save_filter), stringResource(R.string.settings_save_filter_sub), s.saveFilters, actions.onSaveFilters) }
             item { ClickRow(stringResource(R.string.settings_episode_minutes), stringResource(R.string.minutes_short, s.defaultEpisodeMinutes) + " — " + stringResource(R.string.settings_episode_minutes_sub)) { dialog = "minutes" } }
+
+            // v1.4.0: adult titles/genres/tags (metadata and posters only) stay hidden unless switched on here.
+            item { Header("المحتوى") }
+            item {
+                androidx.compose.foundation.layout.Column(Modifier.testTag("adult_switch")) {
+                    SwitchRow("محتوى +18", "يُظهر الأعمال المصنّفة للكبار وتصنيفاتها في البحث والتصنيفات (معلومات وصور غلاف فقط). مقفل افتراضياً.", adult) { on ->
+                        if (on && !adultConfirmed) dialog = "adult_confirm" else onAdult(on, false)
+                    }
+                }
+            }
 
             item { Header(stringResource(R.string.settings_player)) }
             item { ClickRow(stringResource(R.string.settings_default_player), stringResource(R.string.settings_player_none) + "\n" + stringResource(R.string.settings_player_note)) { } }
@@ -217,6 +235,14 @@ fun SettingsContent(
             stringResource(R.string.settings_seek),
             listOf(5, 10, 15, 30, 85).map { it to stringResource(R.string.settings_seek_value, it) },
             s.seekSeconds, { actions.onSeek(it); dialog = null }, { dialog = null },
+        )
+        "adult_confirm" -> AlertDialog(
+            onDismissRequest = { dialog = null }, containerColor = Palette.Card,
+            modifier = Modifier.testTag("adult_confirm"),
+            title = { Text("تأكيد العمر", style = MaterialTheme.typography.headlineSmall.mixed()) },
+            text = { Text("هذا الخيار يُظهر أعمالاً مصنّفة للكبار فقط. هل عمرك 18 سنة أو أكثر؟", style = MaterialTheme.typography.bodyMedium.mixed()) },
+            confirmButton = { TextButton(onClick = { onAdult(true, true); dialog = null }, modifier = Modifier.testTag("adult_yes")) { Text("نعم، عمري 18 أو أكثر") } },
+            dismissButton = { TextButton(onClick = { dialog = null }) { Text("لا", color = Palette.TextSecondary) } },
         )
         "delete" -> AlertDialog(
             onDismissRequest = { dialog = null }, containerColor = Palette.Card,
@@ -372,5 +398,8 @@ fun SettingsScreen(onMenu: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
         ),
         snackbar,
         account,
+        adult = vm.adult.collectAsStateWithLifecycle().value,
+        adultConfirmed = vm.adultConfirmed.collectAsStateWithLifecycle().value,
+        onAdult = { on, c -> vm.setAdult(on, c) },
     )
 }

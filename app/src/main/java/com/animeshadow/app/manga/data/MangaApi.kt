@@ -134,10 +134,10 @@ object MangaQueries {
     private const val CARD = "id title{romaji english native} coverImage{large extraLarge color} bannerImage format status countryOfOrigin chapters volumes averageScore popularity genres isAdult"
 
     val PAGE = """
-        query(${'$'}page:Int,${'$'}perPage:Int,${'$'}sort:[MediaSort],${'$'}country:CountryCode,${'$'}genre:String,${'$'}search:String){
+        query(${'$'}page:Int,${'$'}perPage:Int,${'$'}sort:[MediaSort],${'$'}country:CountryCode,${'$'}genre:String,${'$'}tag:String,${'$'}adult:Boolean,${'$'}search:String){
           Page(page:${'$'}page,perPage:${'$'}perPage){
             pageInfo{hasNextPage currentPage}
-            media(type:MANGA,isAdult:false,sort:${'$'}sort,countryOfOrigin:${'$'}country,genre:${'$'}genre,search:${'$'}search){ $CARD }
+            media(type:MANGA,isAdult:${'$'}adult,sort:${'$'}sort,countryOfOrigin:${'$'}country,genre:${'$'}genre,tag:${'$'}tag,search:${'$'}search){ $CARD }
           }
         }
     """.trimIndent()
@@ -146,7 +146,7 @@ object MangaQueries {
         query(${'$'}id:Int){ Media(id:${'$'}id,type:MANGA){ $CARD description(asHtml:false) source startDate{year month day} endDate{year month day} idMal staff(perPage:8,sort:RELEVANCE){edges{role node{name{full}}}} relations{edges{relationType node{id type format title{romaji english native} coverImage{large extraLarge color} averageScore}}} } }
     """.trimIndent()
 
-    fun page(page: Int, sort: String, country: String?, genre: String? = null, search: String? = null, perPage: Int = 30) = GqlRequest(
+    fun page(page: Int, sort: String, country: String?, genre: String? = null, search: String? = null, perPage: Int = 30, tag: String? = null, adult: Boolean? = false) = GqlRequest(
         PAGE,
         buildJsonObject {
             put("page", page)
@@ -154,6 +154,9 @@ object MangaQueries {
             putJsonArray("sort") { add(kotlinx.serialization.json.JsonPrimitive(sort)) }
             if (country != null) put("country", country)
             if (genre != null) put("genre", genre)
+            if (tag != null) put("tag", tag)
+            // v1.4.0: false = no 18+ (default); null (only with «محتوى +18» on) = everything
+            if (adult != null) put("adult", adult)
             if (!search.isNullOrBlank()) put("search", search)
         },
     )

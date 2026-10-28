@@ -126,6 +126,7 @@ class MangaSearchViewModel @Inject constructor(
     private val repo: MangaRepository,
     private val settings: SettingsRepository,
     state: SavedStateHandle,
+    private val extra: com.animeshadow.app.data.settings.ExtraPrefs,
 ) : ViewModel() {
     private val genre: String? = state.get<String>("name")
     private val _ui = MutableStateFlow(MangaSearchUi(genre = genre))
@@ -162,7 +163,8 @@ class MangaSearchViewModel @Inject constructor(
         val u = _ui.value
         _ui.value = u.copy(loading = true, failed = false)
         try {
-            val (items, hasNext) = repo.search(if (popular) null else u.query, u.genre, u.kind, p)
+            val tagArg = u.genre?.takeIf { it.startsWith(com.animeshadow.app.domain.BrowseQuery.TAG_PREFIX) }?.removePrefix(com.animeshadow.app.domain.BrowseQuery.TAG_PREFIX)
+            val (items, hasNext) = repo.search(if (popular) null else u.query, if (tagArg != null) null else u.genre, u.kind, p, tag = tagArg, adult = extra.adultNow())
             page = p
             more = hasNext
             _ui.value = _ui.value.copy(items = if (reset) items else (_ui.value.items + items).distinctBy { it.id }, loading = false)

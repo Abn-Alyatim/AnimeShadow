@@ -484,6 +484,8 @@ private fun MangaDetailsTab(ui: MangaTitleUi, m: MangaEntity, actions: MangaTitl
             }
         }
         item(key = "info") { MangaInfoGrid(m) }
+        // v1.4.0 «اقرأ رسمياً»: the publisher's own readers AniList lists (MANGA Plus, VIZ, K MANGA…); no in-app chapter source is legal with ads.
+        item(key = "read_official") { com.animeshadow.app.ui.watch.ReadOfficialSection(m.id, modifier = Modifier.padding(horizontal = 16.dp)) }
         val rel = MangaRelation.forPage(m.relationList)
         if (rel.isNotEmpty()) item(key = "related") { MangaRelatedRow(rel, actions.onOpenTitle) }
     }

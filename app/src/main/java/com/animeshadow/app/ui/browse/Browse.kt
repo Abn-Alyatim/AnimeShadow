@@ -103,12 +103,15 @@ data class BrowseUi(
     val grid: Boolean = true,
     /** v1.2: pull-to-refresh running; the current results stay on screen. */
     val refreshing: Boolean = false,
+    /** v1.4.0: «محتوى +18» is on (Settings) → the age filter and adult genres/tags are offered. */
+    val adultAllowed: Boolean = false,
 )
 
 @HiltViewModel
 class BrowseViewModel @Inject constructor(
     private val repo: AnimeRepository,
     private val settings: SettingsRepository,
+    private val extra: com.animeshadow.app.data.settings.ExtraPrefs,
 ) : ViewModel() {
     private val _ui = MutableStateFlow(BrowseUi())
     val ui: StateFlow<BrowseUi> = _ui.asStateFlow()
@@ -116,6 +119,15 @@ class BrowseViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { settings.settings.collect { s -> _ui.update { it.copy(grid = s.gridMode) } } }
+        // v1.4.0: 18+ titles/genres/tags only when «محتوى +18» is on in Settings; switching it off resets the filter.
+        viewModelScope.launch {
+            extra.adult.collect { on ->
+                val q = _ui.value.query
+                val safe = if (on) q else q.copy(adult = false, genre = q.genre?.takeUnless { it in com.animeshadow.app.domain.AniTags.ADULT_GENRES }, tag = q.tag?.takeUnless { com.animeshadow.app.domain.AniTags.isAdultTag(it) })
+                _ui.update { it.copy(adultAllowed = on, query = safe) }
+                if (safe != q) load(reset = true)
+            }
+        }
         load(reset = true)
     }
 
@@ -246,7 +258,7 @@ fun BrowseContent(
     if (showSort) SortDialog(ui.query.sort, { onQuery(ui.query.copy(sort = it)); showSort = false }, { showSort = false })
     if (showFilter) {
         ModalBottomSheet(onDismissRequest = { showFilter = false }, containerColor = Palette.Surface) {
-            FilterSheet(ui.query, onApply = { onQuery(it); showFilter = false }, onCancel = { showFilter = false })
+            FilterSheet(ui.query, onApply = { onQuery(it); showFilter = false }, onCancel = { showFilter = false }, adultAllowed = ui.adultAllowed)
         }
     }
 }
@@ -283,7 +295,7 @@ fun SortDialog(current: BrowseSort, onPick: (BrowseSort) -> Unit, onDismiss: () 
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun FilterSheet(initial: BrowseQuery, onApply: (BrowseQuery) -> Unit, onCancel: () -> Unit) {
+fun FilterSheet(initial: BrowseQuery, onApply: (BrowseQuery) -> Unit, onCancel: () -> Unit, adultAllowed: Boolean = false) {
     var q by remember { mutableStateOf(initial) }
     val thisYear = java.time.LocalDate.now().year
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding()) {
@@ -301,9 +313,15 @@ fun FilterSheet(initial: BrowseQuery, onApply: (BrowseQuery) -> Unit, onCancel: 
             (thisYear + 1 downTo thisYear - 14).forEach { y -> SelectChip(y.toString(), q.year == y, { q = q.copy(year = if (q.year == y) null else y) }) }
         }
         FilterGroup(stringResource(R.string.filter_genre)) {
-            BrowseQuery.GENRES.forEach { g -> SelectChip(genreLabel(g), q.genre == g, { q = q.copy(genre = if (q.genre == g) null else g) }) }
+            com.animeshadow.app.domain.AniTags.genres(adultAllowed).forEach { g -> SelectChip(genreLabel(g), q.genre == g, { q = q.copy(genre = if (q.genre == g) null else g) }, Modifier.testTag("fgenre_$g")) }
         }
-        FilterGroup(stringResource(R.string.filter_age)) {
+        // v1.4.0: AniList tags (the most used ones here; every tag is in «التصنيفات» from the menu).
+        FilterGroup("وسوم") {
+            val shown = (com.animeshadow.app.domain.AniTags.POPULAR + listOfNotNull(q.tag)).distinct()
+                .filter { adultAllowed || !com.animeshadow.app.domain.AniTags.isAdultTag(it) }
+            shown.forEach { t -> SelectChip(com.animeshadow.app.domain.AniTags.ar(t), q.tag == t, { q = q.copy(tag = if (q.tag == t) null else t) }, Modifier.testTag("ftag_$t")) }
+        }
+        if (adultAllowed) FilterGroup(stringResource(R.string.filter_age)) {
             listOf(false to R.string.age_safe, null to R.string.age_any, true to R.string.age_adult).forEach { (v, res) ->
                 SelectChip(stringResource(res), q.adult == v, { q = q.copy(adult = v) }, Modifier.testTag("age_$v"))
             }

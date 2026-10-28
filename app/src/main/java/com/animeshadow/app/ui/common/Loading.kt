@@ -51,6 +51,12 @@ import kotlinx.coroutines.withContext
 val LocalAnimatedLoader = staticCompositionLocalOf { true }
 
 /**
+ * v1.4.0: the Shadow mark is now a small square «app icon» (360×360 animated WebP with alpha, 110 frames at 30 fps,
+ * cut from Madyan's clip with a feathered round edge), used for the splash, the login screen and every loader.
+ */
+const val SHADOW_CLIP_ASPECT = 1f
+
+/**
  * The Shadow loader (res/raw/shadow_loop.webp: 528×360 animated WebP, 110 frames at 30 fps, a seamless 3.7 s loop).
  * v1.3.1: it is cut from the SAME clip as the splash/login video (Madyan's 1.3 video), with the same pure-black,
  * feathered edges — 1.3.0 still played the old v1.2 clip here, which is the «old video» seen when switching to Manga
@@ -76,7 +82,6 @@ fun ShadowLoop(modifier: Modifier = Modifier) {
             factory = { c ->
                 ImageView(c).apply {
                     scaleType = ImageView.ScaleType.FIT_CENTER
-                    setBackgroundColor(android.graphics.Color.BLACK)
                     addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
                         override fun onViewAttachedToWindow(v: android.view.View) { startLoop((v as ImageView).drawable) }
                         override fun onViewDetachedFromWindow(v: android.view.View) = Unit
@@ -108,10 +113,13 @@ private suspend fun decodeLoop28(ctx: Context): Drawable? = withContext(Dispatch
     }.getOrNull()
 }
 
+/** v1.4.0: small and centred, like an app icon. */
+val LOADER_SIZE = 112.dp
+
 /** Full-area loading state: the small Shadow loop on black (replaces the v1.1 spinner). */
 @Composable
 fun LoadingBox(modifier: Modifier = Modifier) {
-    ScrollableCenter(modifier.testTag("loading")) { ShadowLoop(Modifier.width(184.dp)) }
+    ScrollableCenter(modifier.testTag("loading")) { ShadowLoop(Modifier.width(LOADER_SIZE)) }
 }
 
 /**

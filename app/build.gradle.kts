@@ -36,6 +36,14 @@ val adsEnabled: Boolean = ((project.findProperty("adsEnabled") as String?) ?: "t
 // google.webClientId=… in local.properties; -PgoogleWebClientId= (empty) builds the login as «not activated».
 val googleWebClientId: String = ((project.findProperty("googleWebClientId") as String?) ?: localProps.getProperty("google.webClientId")
     ?: "674853191136-m6gc2oct6agk6bbm8kga5muvdco96ro3.apps.googleusercontent.com").trim()
+// v1.4.0: AdMob ids. Google's TEST ids by default; Madyan's real ones via -PadmobAppId/-PadmobBanner/-PadmobInterstitial
+// or admob.appId / admob.banner / admob.interstitial in local.properties (see ADMOB_AR.md). Ids are public, not secrets.
+fun prop(p: String, l: String, d: String): String = ((project.findProperty(p) as String?) ?: localProps.getProperty(l) ?: d).trim().replace("\"", "")
+val admobAppId = prop("admobAppId", "admob.appId", "ca-app-pub-3940256099942544~3347511713")
+val admobBanner = prop("admobBanner", "admob.banner", "ca-app-pub-3940256099942544/9214589741")
+val admobInterstitial = prop("admobInterstitial", "admob.interstitial", "ca-app-pub-3940256099942544/1033173712")
+// v1.4.0: «شادو سينباي» chat backend = Madyan's panel server (the AI key lives only there).
+val chatBaseUrl = prop("chatBaseUrl", "chat.baseUrl", "https://madyanpanel.hostless.app")
 val myMemoryEmail: String = (project.findProperty("mymemoryEmail") as String?) ?: localProps.getProperty("mymemory.email") ?: ""
 
 android {
@@ -46,8 +54,8 @@ android {
         applicationId = "com.animeshadow.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.3.1"
+        versionCode = 7
+        versionName = "1.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("String", "MYMEMORY_EMAIL", "\"${myMemoryEmail.replace("\"", "")}\"")
@@ -55,8 +63,10 @@ android {
         buildConfigField("String", "ANILIST_REDIRECT", "\"animeshadow://anilist-auth\"")
         buildConfigField("boolean", "ADS_ENABLED", adsEnabled.toString())
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${googleWebClientId.replace("\"", "")}\"")
-        buildConfigField("String", "ADS_BANNER_UNIT", "\"ca-app-pub-3940256099942544/9214589741\"")
-        manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+        buildConfigField("String", "ADS_BANNER_UNIT", "\"$admobBanner\"")
+        buildConfigField("String", "ADS_INTERSTITIAL_UNIT", "\"$admobInterstitial\"")
+        buildConfigField("String", "CHAT_BASE_URL", "\"$chatBaseUrl\"")
+        manifestPlaceholders["admobAppId"] = admobAppId
     }
 
     signingConfigs {
