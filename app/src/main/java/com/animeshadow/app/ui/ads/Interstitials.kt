@@ -34,7 +34,7 @@ object Interstitials {
 
     fun isBlocked(route: String?): Boolean = route == null || NEVER.any { route.contains(it, ignoreCase = true) }
 
-    private fun enabled() = BuildConfig.ADS_ENABLED && android.os.Build.FINGERPRINT != "robolectric"
+    private fun enabled() = Ads.enabled && BuildConfig.ADS_INTERSTITIAL_UNIT.isNotBlank() && android.os.Build.FINGERPRINT != "robolectric"
 
     fun preload(context: Context) {
         if (!enabled() || ad != null || loading) return

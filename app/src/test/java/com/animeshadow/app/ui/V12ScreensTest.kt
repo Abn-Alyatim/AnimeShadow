@@ -38,6 +38,10 @@ import com.animeshadow.app.domain.BrowseQuery
 import com.animeshadow.app.testutil.Fixtures
 import com.animeshadow.app.testutil.TestImages
 import com.animeshadow.app.ui.ads.LocalAdPreview
+import org.junit.Assert.assertFalse
+import com.animeshadow.app.BuildConfig
+import com.animeshadow.app.ui.ads.Ads
+import com.animeshadow.app.ui.ads.LocalAdsEnabled
 import com.animeshadow.app.ui.browse.BrowseContent
 import com.animeshadow.app.ui.browse.BrowseUi
 import com.animeshadow.app.ui.collections.PopularCharactersContent
@@ -181,8 +185,19 @@ class V12ScreensTest {
     }
 
     @Test fun banner_on_list_screens_only() {
-        set { FeedContent(stringResource(R.string.nav_latest), feed, {}, {}, {}, {}, {}, {}) }
+        // With real AdMob ids the list screens carry the banner slot.
+        set { CompositionLocalProvider(LocalAdsEnabled provides true) { FeedContent(stringResource(R.string.nav_latest), feed, {}, {}, {}, {}, {}, {}) } }
         compose.onNodeWithTag("ad_banner").assertIsDisplayed()
+    }
+
+    @Test fun no_ads_at_all_without_admob_ids() {
+        // v1.5.0 ships without ads: no ids at build time = ads off, no banner slot (no gap), no units, no SDK start.
+        assertFalse(BuildConfig.ADS_ENABLED)
+        assertFalse(Ads.enabled)
+        assertEquals("", BuildConfig.ADS_BANNER_UNIT)
+        assertEquals("", BuildConfig.ADS_INTERSTITIAL_UNIT)
+        set { FeedContent(stringResource(R.string.nav_latest), feed, {}, {}, {}, {}, {}, {}) }
+        compose.onNodeWithTag("ad_banner").assertDoesNotExist()
     }
 
     @Test fun no_banner_on_details() {

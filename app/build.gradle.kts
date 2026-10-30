@@ -28,20 +28,30 @@ val localProps = Properties().apply {
 // v1.2: AniList login (OAuth implicit grant). The client id is public (not a secret) and empty by default: the login
 // button then explains that it isn't activated yet. Set -PanilistClientId=12345 or anilist.clientId=12345 in local.properties.
 val aniListClientId: String = ((project.findProperty("anilistClientId") as String?) ?: localProps.getProperty("anilist.clientId") ?: "").trim()
-// v1.2: Google's TEST ad units only (never real ones in this build). -PadsEnabled=false removes the banner.
+// -PadsEnabled=false forces ads off even when real ids are set.
 val adsEnabled: Boolean = ((project.findProperty("adsEnabled") as String?) ?: "true").toBoolean()
-// v1.3: Google sign-in (Credential Manager). The Web client ID of Madyan's Google Cloud project (public, not a secret).
-// It only works once that project also has an Android OAuth client for com.animeshadow.app + the signing SHA-1
-// (76:29:9F:69:58:16:51:2D:43:E7:F0:DF:6D:1E:45:6C:11:D9:B2:BF) — see GOOGLE_LOGIN_AR.md. Override: -PgoogleWebClientId=… or
-// google.webClientId=… in local.properties; -PgoogleWebClientId= (empty) builds the login as «not activated».
-val googleWebClientId: String = ((project.findProperty("googleWebClientId") as String?) ?: localProps.getProperty("google.webClientId")
-    ?: "674853191136-m6gc2oct6agk6bbm8kga5muvdco96ro3.apps.googleusercontent.com").trim()
-// v1.4.0: AdMob ids. Google's TEST ids by default; Madyan's real ones via -PadmobAppId/-PadmobBanner/-PadmobInterstitial
-// or admob.appId / admob.banner / admob.interstitial in local.properties (see ADMOB_AR.md). Ids are public, not secrets.
-fun prop(p: String, l: String, d: String): String = ((project.findProperty(p) as String?) ?: localProps.getProperty(l) ?: d).trim().replace("\"", "")
-val admobAppId = prop("admobAppId", "admob.appId", "ca-app-pub-3940256099942544~3347511713")
-val admobBanner = prop("admobBanner", "admob.banner", "ca-app-pub-3940256099942544/9214589741")
-val admobInterstitial = prop("admobInterstitial", "admob.interstitial", "ca-app-pub-3940256099942544/1033173712")
+// v1.5.0: Google sign-in (Credential Manager). The Web client ID of AnimeShadow's OWN Google Cloud project, read only from
+// GOOGLE_WEB_CLIENT_ID in local.properties (never committed) or -PGOOGLE_WEB_CLIENT_ID=…; empty = the login says
+// «تسجيل الدخول غير مفعّل بعد». The project also needs an Android OAuth client for com.animeshadow.app + the signing SHA-1
+// (76:29:9F:69:58:16:51:2D:43:E7:F0:DF:6D:1E:45:6C:11:D9:B2:BF) — see GOOGLE_LOGIN_AR.md.
+val googleWebClientId: String = ((project.findProperty("GOOGLE_WEB_CLIENT_ID") as String?) ?: (project.findProperty("googleWebClientId") as String?)
+    ?: localProps.getProperty("GOOGLE_WEB_CLIENT_ID") ?: localProps.getProperty("google.webClientId") ?: "").trim()
+// v1.4.0: AdMob ids via -PadmobAppId/-PadmobBanner/-PadmobInterstitial or admob.appId / admob.banner /
+// admob.interstitial in local.properties (see ADMOB_AR.md). Ids are public, not secrets.
+// v1.5.0: ADS ARE OFF until Madyan's real ids exist: ADMOB_APP_ID / ADMOB_BANNER_ID / ADMOB_INTERSTITIAL_ID in
+// local.properties (never committed) or -PADMOB_APP_ID=…. Blank or missing = no ads at all: no banner slot (no gap in
+// the layout), no interstitial, MobileAds is never initialised, nothing is requested. When the ids arrive only these
+// properties change — no code change.
+fun prop(p: String, l: String, d: String, vararg alt: String): String =
+    (listOf(p, *alt).firstNotNullOfOrNull { (project.findProperty(it) as String?)?.takeIf { v -> v.isNotBlank() } }
+        ?: listOf(l, *alt).firstNotNullOfOrNull { localProps.getProperty(it)?.takeIf { v -> v.isNotBlank() } } ?: d).trim().replace("\"", "")
+val admobAppId = prop("admobAppId", "admob.appId", "", "ADMOB_APP_ID")
+val admobBanner = prop("admobBanner", "admob.banner", "", "ADMOB_BANNER_ID")
+val admobInterstitial = prop("admobInterstitial", "admob.interstitial", "", "ADMOB_INTERSTITIAL_ID")
+val adsOn: Boolean = adsEnabled && admobAppId.startsWith("ca-app-pub-") && admobBanner.startsWith("ca-app-pub-")
+// The ads SDK's start-up provider needs SOME app id in the manifest or the app crashes at launch; with ads off it gets
+// Google's sample app id and no ad is ever requested (no AdView is created, MobileAds.initialize is never called).
+val admobManifestAppId = if (adsOn) admobAppId else "ca-app-pub-3940256099942544~3347511713"
 // v1.4.0: «شادو سينباي» chat backend = Madyan's panel server (the AI key lives only there).
 val chatBaseUrl = prop("chatBaseUrl", "chat.baseUrl", "https://madyanpanel.hostless.app")
 val myMemoryEmail: String = (project.findProperty("mymemoryEmail") as String?) ?: localProps.getProperty("mymemory.email") ?: ""
@@ -54,19 +64,19 @@ android {
         applicationId = "com.animeshadow.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.4.0"
+        versionCode = 8
+        versionName = "1.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("String", "MYMEMORY_EMAIL", "\"${myMemoryEmail.replace("\"", "")}\"")
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"${aniListClientId.filter { it.isDigit() }}\"")
         buildConfigField("String", "ANILIST_REDIRECT", "\"animeshadow://anilist-auth\"")
-        buildConfigField("boolean", "ADS_ENABLED", adsEnabled.toString())
+        buildConfigField("boolean", "ADS_ENABLED", adsOn.toString())
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${googleWebClientId.replace("\"", "")}\"")
-        buildConfigField("String", "ADS_BANNER_UNIT", "\"$admobBanner\"")
-        buildConfigField("String", "ADS_INTERSTITIAL_UNIT", "\"$admobInterstitial\"")
+        buildConfigField("String", "ADS_BANNER_UNIT", "\"${if (adsOn) admobBanner else ""}\"")
+        buildConfigField("String", "ADS_INTERSTITIAL_UNIT", "\"${if (adsOn && admobInterstitial.startsWith("ca-app-pub-")) admobInterstitial else ""}\"")
         buildConfigField("String", "CHAT_BASE_URL", "\"$chatBaseUrl\"")
-        manifestPlaceholders["admobAppId"] = admobAppId
+        manifestPlaceholders["admobAppId"] = admobManifestAppId
     }
 
     signingConfigs {

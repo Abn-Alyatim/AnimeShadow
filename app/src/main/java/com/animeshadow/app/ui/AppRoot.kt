@@ -120,6 +120,8 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -182,6 +184,12 @@ object Routes {
     const val CHAT_CONV = "chat/c/{id}"
     fun chatConv(id: String) = "chat/c/" + android.net.Uri.encode(id)
     const val CHAT_SETTINGS = "chat/settings"
+    /** v1.5.0: friends + user-to-user chat, and list export/import/sharing (in both modes). */
+    const val FRIENDS = "friends"
+    const val THREAD = "friends/t/{id}"
+    fun thread(id: String) = "friends/t/" + android.net.Uri.encode(id)
+    const val LISTS = "lists"
+    const val LISTS_BACK = "lists/back"
     fun tag(name: String) = "genre/" + android.net.Uri.encode(com.animeshadow.app.domain.BrowseQuery.TAG_PREFIX + name)
     fun mTag(name: String) = "m_genre/" + android.net.Uri.encode(com.animeshadow.app.domain.BrowseQuery.TAG_PREFIX + name)
 }
@@ -195,12 +203,14 @@ val DrawerEntries = listOf(
     DrawerEntry(Routes.CATEGORIES, R.string.nav_categories, Icons.Filled.Category),
     DrawerEntry(Routes.SEASONS, R.string.nav_seasons, Icons.Filled.ViewModule),
     DrawerEntry(Routes.CHAT, R.string.nav_senpai, Icons.Filled.Person, dividerBefore = true, avatar = true),
+    DrawerEntry(Routes.FRIENDS, R.string.nav_friends, Icons.Filled.Forum),
     DrawerEntry(Routes.TOP, R.string.nav_top, Icons.Filled.Star, dividerBefore = true),
     DrawerEntry(Routes.MYLIST, R.string.nav_mylist, Icons.Filled.Bookmarks, dividerBefore = true),
     DrawerEntry(Routes.FAV_ANIME, R.string.nav_fav_anime, Icons.Filled.Favorite),
     DrawerEntry(Routes.FAV_CHARACTERS, R.string.nav_fav_characters, Icons.Filled.People),
     DrawerEntry(Routes.HISTORY, R.string.nav_history, Icons.Filled.History),
     DrawerEntry(Routes.STATS, R.string.nav_stats, Icons.Filled.BarChart),
+    DrawerEntry(Routes.LISTS, R.string.nav_lists, Icons.Filled.IosShare),
     DrawerEntry(Routes.POPULAR_CHARACTERS, R.string.nav_popular_characters, Icons.Filled.People, dividerBefore = true),
     DrawerEntry(Routes.RECOMMENDATIONS, R.string.nav_recommendations, Icons.Filled.Recommend),
     DrawerEntry(Routes.SCHEDULE, R.string.nav_schedule, Icons.Filled.CalendarMonth),
@@ -213,11 +223,13 @@ val MangaDrawerEntries = listOf(
     DrawerEntry(Routes.M_SEARCH, R.string.manga_browse, Icons.AutoMirrored.Filled.List),
     DrawerEntry(Routes.M_CATEGORIES, R.string.nav_categories, Icons.Filled.Category),
     DrawerEntry(Routes.CHAT, R.string.nav_senpai, Icons.Filled.Person, dividerBefore = true, avatar = true),
+    DrawerEntry(Routes.FRIENDS, R.string.nav_friends, Icons.Filled.Forum),
     DrawerEntry(Routes.M_LIBRARY, R.string.nav_mylist, Icons.Filled.Bookmarks, dividerBefore = true),
     DrawerEntry(Routes.M_FAVORITES, R.string.manga_favorites, Icons.Filled.Favorite),
     DrawerEntry(Routes.M_HISTORY, R.string.manga_history, Icons.Filled.History),
     DrawerEntry(Routes.M_DOWNLOADED, R.string.manga_downloaded, Icons.Filled.DownloadDone, dividerBefore = true),
     DrawerEntry(Routes.M_QUEUE, R.string.manga_queue, Icons.Filled.Download),
+    DrawerEntry(Routes.LISTS, R.string.nav_lists, Icons.Filled.IosShare, dividerBefore = true),
     DrawerEntry(Routes.STATS, R.string.nav_stats, Icons.Filled.Person, dividerBefore = true),
     DrawerEntry(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
 )
@@ -444,6 +456,8 @@ fun AppRoot(openAnimeId: Int? = null, onOpened: () -> Unit = {}, openDownloads: 
                 }
             }
         }
+        // v1.5.0: Madyan Panel maintenance (full screen) + broadcast card, above the app and under nothing but the splash.
+        com.animeshadow.app.ui.status.AppStatusLayer(ready = splashDone)
         ShadowSplash(visible = !splashDone)
     }
 }
@@ -488,6 +502,15 @@ fun androidx.navigation.NavGraphBuilder.sharedScreens(nav: NavHostController, op
         com.animeshadow.app.chat.ChatScreen({ nav.popBackStack() }, onOpenCard = LocalOpenChatCard.current)
     }
     composable(Routes.CHAT_SETTINGS) { com.animeshadow.app.chat.ChatSettingsScreen({ nav.popBackStack() }) }
+    // v1.5.0 friends, chat between users, list sharing
+    composable(Routes.FRIENDS) {
+        com.animeshadow.app.social.FriendsScreen(openMenu, onLogin = { nav.navigate(Routes.LOGIN) }, onOpen = { nav.navigate(Routes.thread(it)) }, onLists = { nav.navigate(Routes.LISTS_BACK) })
+    }
+    composable(Routes.THREAD, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
+        com.animeshadow.app.social.ThreadScreen({ nav.popBackStack() })
+    }
+    composable(Routes.LISTS) { com.animeshadow.app.social.ListsScreen(onBack = { nav.popBackStack() }, onMenu = openMenu) }
+    composable(Routes.LISTS_BACK) { com.animeshadow.app.social.ListsScreen(onBack = { nav.popBackStack() }) }
 }
 
 /** v1.4.0: opens a chat card's anime/manga page, switching mode first when the card is of the other kind. */

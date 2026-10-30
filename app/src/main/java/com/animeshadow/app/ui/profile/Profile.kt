@@ -272,7 +272,10 @@ fun AccountSection(account: GoogleAccount, onLogin: () -> Unit, onLogout: () -> 
                 else Box(m, contentAlignment = Alignment.Center) { GoogleG(Modifier.size(22.dp)) }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(account.name, style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(account.name, style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        if (account.pro) { Spacer(Modifier.width(6.dp)); com.animeshadow.app.social.ProBadge() }
+                    }
                     Text("\u2066" + account.email + "\u2069", style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }

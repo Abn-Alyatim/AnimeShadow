@@ -129,6 +129,7 @@ data class ChatUi(
     val sending: Boolean = false,
     val ready: Boolean? = null,
     val remaining: Int? = null,
+    val limit: Int? = null,
 )
 
 @HiltViewModel
@@ -147,7 +148,7 @@ class ChatViewModel @Inject constructor(
             val existing = convId?.let { id -> repo.store.conversations.value.firstOrNull { it.id == id } }
             if (existing != null) _ui.update { it.copy(conversation = existing, messages = repo.store.messages(existing.id)) }
         }
-        viewModelScope.launch { repo.status()?.let { s -> _ui.update { it.copy(ready = s.ready, remaining = s.remaining) } } }
+        viewModelScope.launch { repo.status()?.let { s -> _ui.update { it.copy(ready = s.ready, remaining = s.remaining, limit = s.limit) } } }
     }
 
     fun setInput(t: String) = _ui.update { it.copy(input = t.take(2000)) }
@@ -314,7 +315,7 @@ private fun NotReadyCard() {
         Spacer(Modifier.height(14.dp))
         Text(ChatRepository.NOT_READY, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), color = Palette.Text)
         Spacer(Modifier.height(6.dp))
-        RtlText("شادو سينباي يجهّز نفسه، ويكون جاهز للكلام قريباً بإذن الله.", color = Palette.TextSecondary, size = 13, align = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+        RtlText("سيعمل شادو سينباي هنا فور تفعيله من الخادم، دون تحديث للتطبيق.", color = Palette.TextSecondary, size = 13, align = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
     }
 }
 
@@ -392,7 +393,7 @@ private fun ChatInputBar(ui: ChatUi, onInput: (String) -> Unit, onSend: () -> Un
     // 0 left today: the server would refuse anyway, so the send button rests until midnight
     val enabled = ui.ready != false && !ui.sending && ui.remaining != 0
     Column(Modifier.fillMaxWidth().background(Palette.Black).navigationBarsPadding().imePadding().padding(horizontal = 10.dp, vertical = 8.dp)) {
-        if (ui.remaining != null && ui.ready != false) Text("باقي اليوم: ${ui.remaining}/$DAILY_LIMIT", color = Palette.TextMuted, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).testTag("chat_remaining"), textAlign = TextAlign.Center)
+        if (ui.remaining != null && ui.ready != false) Text("باقي اليوم: ${ui.remaining}/${ui.limit ?: DAILY_LIMIT}", color = Palette.TextMuted, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).testTag("chat_remaining"), textAlign = TextAlign.Center)
         ui.image?.let { (file, _) ->
             Box(Modifier.padding(bottom = 6.dp)) {
                 AsyncImage(file, null, Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)

@@ -26,8 +26,8 @@ object ChatModule {
     fun extraPrefs(@ApplicationContext context: Context) = ExtraPrefs(context.extraStore)
 
     @Provides @Singleton
-    fun chatRepository(@ApplicationContext context: Context, prefs: ExtraPrefs, db: AppDatabase, mangaDb: MangaDatabase): ChatRepository {
+    fun chatRepository(@ApplicationContext context: Context, prefs: ExtraPrefs, db: AppDatabase, mangaDb: MangaDatabase, account: com.animeshadow.app.data.auth.GoogleAccountRepository): ChatRepository {
         val snapshot = LibrarySnapshot(db, mangaDb)
-        return ChatRepository(ChatStore(File(context.filesDir, "chat")), HttpChatBackend(BuildConfig.CHAT_BASE_URL), prefs) { snapshot.build() }
+        return ChatRepository(ChatStore(File(context.filesDir, "chat")), HttpChatBackend(BuildConfig.CHAT_BASE_URL, session = { account.session }), prefs) { snapshot.build() }
     }
 }

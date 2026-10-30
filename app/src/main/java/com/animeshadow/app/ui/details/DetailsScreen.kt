@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -194,6 +195,11 @@ fun DetailsScreen(
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // v1.5.0: «غير مهتم» (exportable list) from the ⋮ menu.
+    val notInterested = androidx.compose.runtime.remember {
+        runCatching { dagger.hilt.android.EntryPointAccessors.fromApplication(context.applicationContext, com.animeshadow.app.social.NotInterestedEntryPoint::class.java).notInterested() }.getOrNull()
+    }
+    androidx.compose.runtime.CompositionLocalProvider(com.animeshadow.app.social.LocalNotInterested provides notInterested) {
     DetailsContent(
         ui,
         actions = DetailsActions(
@@ -209,6 +215,7 @@ fun DetailsScreen(
             onRetry = { vm.refresh(true) },
         ),
     )
+    }
 }
 
 /** Item 9: long-press copy with the «تم النسخ» toast. */
@@ -253,7 +260,7 @@ fun DetailsContent(ui: DetailsUi, actions: DetailsActions, initialTab: Int = 0) 
                 actions = {
                     if (tab == 1) {
                         // Item 14: a SMALL eye replaces v1.0's wide button. Blue when every episode is watched.
-                        val count = ui.episodeCount
+                        val count = ui.releasedCount
                         val allWatched = count > 0 && (1..count).all { it in ui.watched }
                         IconButton(
                             onClick = {
@@ -373,6 +380,22 @@ private fun MoreMenu(ui: DetailsUi, expanded: Boolean, onDismiss: () -> Unit, ac
         if (a?.trailerId != null && a.trailerSite == "youtube") {
             DropdownMenuItem(text = { Text(stringResource(R.string.cd_play_trailer)) }, onClick = { actions.onTrailer(a.trailerId); onDismiss() })
         }
+        val ni = com.animeshadow.app.social.LocalNotInterested.current
+        if (ni != null && a != null) {
+            val items by ni.items.collectAsStateWithLifecycle()
+            val on = items.any { it.id == a.id && it.k == "ANIME" }
+            val ctx = LocalContext.current
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.not_interested)) },
+                trailingIcon = { Checkbox(checked = on, onCheckedChange = null) },
+                modifier = Modifier.testTag("not_interested"),
+                onClick = {
+                    ni.toggle(com.animeshadow.app.social.ListItem(a.id, a.titleEnglish ?: a.titleRomaji ?: a.displayTitle, "ANIME"))
+                    Toast.makeText(ctx, ctx.getString(if (on) R.string.not_interested_off else R.string.not_interested_on), Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                },
+            )
+        }
         if (ui.entry != null) {
             DropdownMenuItem(text = { Text(stringResource(R.string.remove_from_list), color = Palette.Dropped) }, onClick = { actions.onRemove(); onDismiss() })
         }
@@ -420,7 +443,6 @@ private fun InfoTab(ui: DetailsUi, a: AnimeEntity, actions: DetailsActions) {
             }
         }
         // v1.4.0 «شاهد»: official free episodes (YouTube channels like Muse Asia / Ani-One) + official platforms, from AniList.
-        item(key = "watch") { com.animeshadow.app.ui.watch.WatchSection(a.id, modifier = Modifier.padding(horizontal = 16.dp), showTrailer = false) }
         if (ui.relations.isNotEmpty()) item(key = "related") {
             AnimeRow(stringResource(R.string.related), ui.relations.map { it.anime to relationLabel(it.relationType) }, actions.onOpenAnime)
         }
@@ -507,9 +529,11 @@ private fun RatingRow(ui: DetailsUi, a: AnimeEntity, actions: DetailsActions, on
             CellSub((a.malScoredBy ?: a.malMembers)?.let { groupedCount(it) } ?: "—")
         }
         val overall = ui.entry?.overallScore
-        RatingCell(Modifier.weight(1f).clickable(onClick = onRate).testTag("your_rating"), { Icon(Icons.Filled.Star, null, tint = Palette.Blue, modifier = Modifier.size(26.dp)) }) {
-            ScoreOutOf10(overall?.let { if (it % 1.0 == 0.0) it.toInt().toString() else String.format(Locale.US, "%.1f", it) })
-            CellSub(stringResource(R.string.your_score))
+        // v1.5.0: rating is open while airing; only a title that hasn't started can't be rated yet.
+        val canRate = com.animeshadow.app.domain.Airing.canRate(a)
+        RatingCell(Modifier.weight(1f).clickable(enabled = canRate, onClick = onRate).testTag("your_rating"), { Icon(Icons.Filled.Star, null, tint = if (canRate) Palette.Blue else Palette.RefIcon.copy(alpha = 0.4f), modifier = Modifier.size(26.dp)) }) {
+            ScoreOutOf10(if (canRate) overall?.let { if (it % 1.0 == 0.0) it.toInt().toString() else String.format(Locale.US, "%.1f", it) } else null)
+            CellSub(stringResource(if (canRate) R.string.your_score else R.string.rate_after_airing))
         }
         Box(Modifier.weight(1f).wrapContentSize(Alignment.TopCenter)) {
             RatingCell(Modifier.fillMaxWidth().clickable { statusMenu = true }.testTag("my_list"), { Icon(Icons.Outlined.PlayCircle, null, tint = Color.White, modifier = Modifier.size(26.dp)) }) {
@@ -522,7 +546,7 @@ private fun RatingRow(ui: DetailsUi, a: AnimeEntity, actions: DetailsActions, on
                 CellSub(e?.let { stringResource(watchStatusRes(it.status)) } ?: stringResource(R.string.not_in_list), Modifier.testTag("my_list_status"))
             }
             DropdownMenu(expanded = statusMenu, onDismissRequest = { statusMenu = false }, containerColor = Palette.Card) {
-                WatchStatus.entries.forEach { s ->
+                WatchStatus.entries.filter { it != WatchStatus.COMPLETED || com.animeshadow.app.domain.Airing.canComplete(a) }.forEach { s ->
                     DropdownMenuItem(
                         text = {
                             Text(
@@ -831,9 +855,30 @@ private fun EpisodesTab(ui: DetailsUi, a: AnimeEntity, actions: DetailsActions, 
         EmptyState(stringResource(R.string.episodes_unknown_total))
         return
     }
+    val released = ui.releasedCount
     LazyColumn(Modifier.fillMaxSize().testTag("episodes_list"), contentPadding = PaddingValues(bottom = 16.dp)) {
         items(episodes, key = { it }) { e ->
             val watched = e in ui.watched
+            if (e > released && !watched) {
+                // v1.5.0: announced but not out yet — shown, not markable; it turns normal by itself once AniList lists it.
+                val whenText = if (e == a.nextEpisode) a.nextAiringAt?.let { com.animeshadow.app.ui.common.airingWhen(it) } else null
+                Row(
+                    Modifier.fillMaxWidth().height(46.dp).padding(start = 14.dp, end = 14.dp).testTag("ep_upcoming_$e"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.episode_label, e), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.5.sp, fontWeight = FontWeight.Bold),
+                        color = Palette.RefIcon.copy(alpha = 0.55f), textAlign = TextAlign.Left, modifier = Modifier.weight(1f),
+                    )
+                    Icon(Icons.Outlined.Schedule, null, tint = Palette.RefIcon.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                    Text(
+                        whenText ?: stringResource(R.string.ep_not_aired),
+                        style = MaterialTheme.typography.bodySmall, color = if (whenText != null) Palette.Blue else Palette.RefIcon,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+                return@items
+            }
             Row(
                 Modifier.fillMaxWidth()
                     .combinedClickable(onClick = { actions.onEpisode(e, !watched) }, onLongClick = { actions.onMarkUpTo(e) })

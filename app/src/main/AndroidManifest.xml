@@ -68,6 +68,14 @@
             tools:node="merge" />
 
         <!-- WorkManager is initialised by the app (Hilt worker factory), not by App Startup. -->
+        <!-- v1.5.0: list exports shared through the Android share sheet -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

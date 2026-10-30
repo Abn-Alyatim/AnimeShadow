@@ -1,25 +1,28 @@
-# تفعيل تسجيل الدخول بحساب Google — AnimeShadow 1.3
+# تسجيل الدخول بحساب Google — AnimeShadow 1.5.0
 
-الزر جاهز داخل التطبيق (شاشة «تسجيل الدخول» من الملف الشخصي). يحتاج خطوة واحدة منك في Google Cloud
-داخل **نفس المشروع** الذي فيه الـ Web client ID:
-`674853191136-m6gc2oct6agk6bbm8kga5muvdco96ro3.apps.googleusercontent.com`
+من 1.5.0 لأنمي شادو مشروع Google Cloud خاص: **AnimeShadow** (`animeshadow-513201`).
 
-## الخطوات (5 دقائق)
+* عميل Web (يُستعمل كـ serverClientId): يوضع في `local.properties` فقط (لا يُرفع إلى GitHub):
+  `GOOGLE_WEB_CLIENT_ID=851726861399-…apps.googleusercontent.com`
+  (أو `-PGOOGLE_WEB_CLIENT_ID=…`). الفارغ = يظهر «تسجيل الدخول غير مفعّل بعد».
+* عميل Android في نفس المشروع: Package `com.animeshadow.app` + SHA-1
+  `76:29:9F:69:58:16:51:2D:43:E7:F0:DF:6D:1E:45:6C:11:D9:B2:BF` (مُسجّل).
+* إذا كانت شاشة الموافقة (OAuth consent screen) في وضع **Testing** أضف الإيميلات في Test users، أو انشرها (Publish).
 
-1. افتح https://console.cloud.google.com/apis/credentials واختر المشروع الذي فيه الـ Web client أعلاه.
-2. **Create credentials → OAuth client ID**.
-3. Application type: **Android**.
-4. Package name: `com.animeshadow.app`
-5. SHA-1 certificate fingerprint:
-   `76:29:9F:69:58:16:51:2D:43:E7:F0:DF:6D:1E:45:6C:11:D9:B2:BF`
-6. اضغط **Create**. لا تحتاج تنزيل أي ملف ولا إعادة بناء التطبيق.
-7. إذا كانت شاشة الموافقة (OAuth consent screen) في وضع **Testing** أضف إيميلك في Test users، أو انشرها (Publish).
+## السيرفر (لوحة مدين على hostless)
 
-بعدها افتح التطبيق ← الملف الشخصي ← «تسجيل الدخول بحساب Google». قد يحتاج Google حتى ساعة ليتعرف على التطبيق.
+السيرفر يتحقق من رمز Google ويقبل فقط عملاء هذا المشروع. في مشروع **madyanpanel** على hostless ← Environment:
 
-## ملاحظات
+```
+ANIMESHADOW_GOOGLE_CLIENT_IDS=<نفس GOOGLE_WEB_CLIENT_ID أعلاه: 851726861399-…apps.googleusercontent.com>
+```
 
-* قبل هذه الخطوة يظهر للمستخدم: «تسجيل الدخول بـ Google لم يُفعَّل لهذا التطبيق بعد» — بدون أي خطأ أو زر إعادة.
-* إذا وقّعت التطبيق لاحقاً بمفتاح آخر (أو رفعته على Google Play بتوقيع Play) أضف SHA-1 الجديد كـ Android client آخر.
-* لتغيير الـ Web client ID بدون تعديل الكود: `-PgoogleWebClientId=...` أو `google.webClientId=...` في local.properties.
-* تسجيل الدخول اختياري؛ كل شيء في التطبيق يعمل بدونه، والقائمة محفوظة على الجهاز.
+بدونه يرد السيرفر «تسجيل الدخول غير مفعّل بعد في السيرفر» ويبقى الدخول محلياً فقط (المكتبة تعمل، الأصدقاء والدردشة لا).
+
+## رسائل الأخطاء في التطبيق
+
+* خطأ 10 من Google ← «عميل Android … غير مسجّل بعد» (الحزمة أو SHA-1 ناقصة/خاطئة في المشروع).
+* لا يوجد حساب Google على الجهاز ← يطلب إضافة حساب من إعدادات الهاتف.
+* شبكة / خدمات Google Play ← رسالة واضحة لكل حالة.
+
+تسجيل الدخول اختياري؛ المكتبة محفوظة على الجهاز وكل شيء يعمل بدونه ما عدا الأصدقاء والدردشة وPro.

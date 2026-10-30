@@ -40,7 +40,7 @@ private val Context.readerStore: DataStore<Preferences> by preferencesDataStore(
 object MangaModule {
     @Provides @Singleton
     fun mangaDatabase(@ApplicationContext context: Context): MangaDatabase =
-        Room.databaseBuilder(context, MangaDatabase::class.java, MangaDatabase.NAME).addMigrations(MangaDatabase.MIGRATION_1_2).build()
+        Room.databaseBuilder(context, MangaDatabase::class.java, MangaDatabase.NAME).addMigrations(MangaDatabase.MIGRATION_1_2, MangaDatabase.MIGRATION_2_3).build()
 
     @Provides @Singleton
     fun mangaApi(): MangaApi = Retrofit.Builder()

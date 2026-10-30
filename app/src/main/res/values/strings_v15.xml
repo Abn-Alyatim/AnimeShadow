@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.5.0: sign-in, airing episodes, manga chapters, friends/chat, lists, maintenance, broadcast. -->
+<resources>
+    <string name="login_not_ready">تسجيل الدخول غير مفعّل بعد في هذه النسخة.</string>
+    <string name="login_error_10">رفضت Google الدخول (خطأ 10): عميل Android للتطبيق com.animeshadow.app مع بصمة SHA-1 غير مسجّل بعد في مشروع Google Cloud الخاص بأنمي شادو.</string>
+    <string name="login_network">تعذّر الاتصال بـGoogle. تحقّق من الإنترنت ثم حاول مرة أخرى.</string>
+    <string name="login_play_services">خدمات Google Play في هذا الهاتف لا تدعم تسجيل الدخول. حدّثها ثم حاول مرة أخرى.</string>
+    <string name="login_failed_generic">تعذّر تسجيل الدخول الآن. حاول مرة أخرى بعد قليل.</string>
+    <string name="login_done_offline">تم تسجيل الدخول. الأصدقاء والدردشة سيعملان عند توفر الخادم.</string>
+    <string name="ep_airs_on">تُعرض %1$s %2$s</string>
+    <string name="ep_not_aired">لم تُعرض بعد</string>
+    <string name="rate_after_airing">التقييم بعد بدء العرض</string>
+    <string name="manga_chapters_unknown">لا تتوفر قائمة الفصول لهذا العنوان بعد.</string>
+    <string name="nav_friends">الأصدقاء والدردشة</string>
+    <string name="nav_lists">مشاركة القوائم</string>
+    <string name="maintenance_title">التطبيق في صيانة قصيرة</string>
+    <string name="maintenance_default">نعمل على تحسين أنمي شادو، سنعود خلال وقت قصير.</string>
+    <string name="maintenance_retry">إعادة المحاولة</string>
+    <string name="maintenance_auto">يُعاد الفحص تلقائياً كل 30 ثانية</string>
+    <string name="maintenance_until">العودة المتوقعة: %1$s</string>
+    <string name="broadcast_ok">حسناً</string>
+    <string name="broadcast_from">رسالة من أنمي شادو</string>
+    <string name="not_interested">غير مهتم</string>
+    <string name="not_interested_on">أُضيف إلى «غير مهتم»</string>
+    <string name="not_interested_off">أُزيل من «غير مهتم»</string>
+</resources>

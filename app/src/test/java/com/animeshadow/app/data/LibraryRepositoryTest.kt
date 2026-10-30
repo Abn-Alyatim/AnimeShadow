@@ -83,7 +83,8 @@ class LibraryRepositoryTest {
     @Test fun airing_show_without_total_is_never_auto_completed() = runTest {
         repo.markUpTo(2, 7)
         assertEquals(WatchStatus.WATCHING, repo.entry(2)!!.status)
-        assertEquals(8, repo.increment(2))
+        // v1.5.0: episode 8 is announced but not out yet, so +1 stays at 7
+        assertEquals(7, repo.increment(2))
     }
 
     @Test fun completed_status_marks_all_episodes() = runTest {

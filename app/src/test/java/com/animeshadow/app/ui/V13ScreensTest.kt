@@ -275,7 +275,8 @@ class V13ScreensTest {
         compose.onNodeWithTag("manga_title_pager").performTouchInput { swipeLeft() }
         compose.waitForIdle(); compose.mainClock.advanceTimeBy(800); compose.waitForIdle()
         compose.onNodeWithTag("chapters_soon").assertExists()
-        compose.onNodeWithText(ctx.getString(R.string.coming_soon)).assertExists()
+        // v1.5.0: no chapter count known → a calm note (no «قريباً», no error)
+        compose.onNodeWithText(ctx.getString(R.string.manga_chapters_unknown)).assertExists()
         compose.onAllNodes(hasText("إعادة", substring = true)).assertCountEquals(0)
         shot("manga_title_chapters_soon")
     }

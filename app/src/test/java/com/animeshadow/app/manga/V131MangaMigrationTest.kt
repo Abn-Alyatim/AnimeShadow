@@ -55,11 +55,12 @@ class V131MangaMigrationTest {
         old.execSQL("INSERT INTO manga_history (chapterKey, mangaId, chapterNumber, page, pageCount, readAt, finished) VALUES ('d:7-1', 7, '1', 20, 20, 9, 1)")
         old.version = 1
         old.close()
-        val room = Room.databaseBuilder(ctx, MangaDatabase::class.java, name).addMigrations(MangaDatabase.MIGRATION_1_2)
+        val room = Room.databaseBuilder(ctx, MangaDatabase::class.java, name).addMigrations(MangaDatabase.MIGRATION_1_2, MangaDatabase.MIGRATION_2_3)
             .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).allowMainThreadQueries().build()
         try {
             val db = room.openHelper.writableDatabase // runs the migration and Room's schema check
-            assertEquals(2, db.version)
+            assertEquals(3, db.version) // 1.5.0 adds manga_read on top of 1→2
+            db.query("SELECT COUNT(*) FROM manga_read").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
             db.query("SELECT status, favorite, userScore FROM manga_library WHERE mangaId = 7").use { c ->
                 assertTrue(c.moveToFirst()); assertEquals("READING", c.getString(0)); assertEquals(1, c.getInt(1)); assertEquals(9, c.getInt(2))
             }

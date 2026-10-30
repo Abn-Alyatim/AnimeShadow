@@ -126,8 +126,9 @@ class V11ViewModelTest {
         waitFor { repo.anime(21) != null }
         val collector = CoroutineScope(Dispatchers.Main).launch { vm.ui.collect { } }
         waitFor { vm.ui.value.anime != null }
-        val count = vm.ui.value.episodeCount
+        val count = vm.ui.value.releasedCount
         assertTrue(count > 1000) // One Piece: next episode 1181 -> 1180 out
+        assertEquals(count + 1, vm.ui.value.episodeCount) // v1.5.0: the announced next one is listed but not markable
         var marked: Boolean? = null
         vm.toggleAllWatched { marked = it }
         waitFor { marked != null && vm.ui.value.watched.size == count }

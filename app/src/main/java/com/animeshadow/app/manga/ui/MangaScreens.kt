@@ -14,6 +14,7 @@ import com.animeshadow.app.ui.common.watchStatusColor
 import com.animeshadow.app.manga.data.MangaRelation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -387,6 +388,7 @@ class MangaTitleActions(
     val onSort: () -> Unit = {},
     val onRead: (ChapterRow) -> Unit = {},
     val onToggleRead: (ChapterRow) -> Unit = {},
+    val onReadUpTo: (ChapterRow) -> Unit = {},
     val onDownload: (ChapterRow.Remote) -> Unit = {},
     val onDownloadAll: () -> Unit = {},
     val onDelete: (String) -> Unit = {},
@@ -677,15 +679,15 @@ private fun MangaRelatedRow(rels: List<MangaRelation>, onOpen: (Int) -> Unit) {
 @Composable
 private fun ChaptersTab(ui: MangaTitleUi, actions: MangaTitleActions) {
     when {
-        !ui.downloadedOnly && !ui.providerAvailable -> {
-            // No legal chapter source yet: «قريباً», never an error and never a retry button.
+        ui.chapters.isEmpty() && ui.chaptersLoading -> LoadingBox()
+        !ui.downloadedOnly && !ui.providerAvailable && ui.chapters.isEmpty() -> {
+            // v1.5.0: no count known yet (new/unlisted title) — a calm empty state, never an error.
             Column(Modifier.fillMaxSize().padding(32.dp).testTag("chapters_soon"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Text(stringResource(R.string.coming_soon), style = MaterialTheme.typography.headlineSmall, color = Palette.Accent, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.manga_chapters_soon), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary, textAlign = TextAlign.Center)
+                Icon(Icons.Outlined.Visibility, null, tint = Palette.Accent, modifier = Modifier.size(40.dp))
+                Spacer(Modifier.height(10.dp))
+                Text(stringResource(R.string.manga_chapters_unknown), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary, textAlign = TextAlign.Center)
             }
         }
-        ui.chapters.isEmpty() && ui.chaptersLoading -> LoadingBox()
         ui.chapters.isEmpty() -> EmptyState(stringResource(if (ui.downloadedOnly) R.string.manga_no_downloaded_chapters else R.string.manga_no_chapters))
         else -> LazyColumn(Modifier.fillMaxSize().testTag("chapter_list"), contentPadding = PaddingValues(bottom = 90.dp)) {
             items(ui.chapters, key = { it.key }) { row -> ChapterItem(row, actions) }
@@ -693,10 +695,12 @@ private fun ChaptersTab(ui: MangaTitleUi, actions: MangaTitleActions) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChapterItem(row: ChapterRow, actions: MangaTitleActions) {
-    val read = when (row) { is ChapterRow.Local -> row.read; is ChapterRow.Remote -> row.read }
-    Row(Modifier.fillMaxWidth().clickable { actions.onRead(row) }.padding(start = 16.dp, end = 4.dp).height(56.dp).testTag("chapter_${row.number}"), verticalAlignment = Alignment.CenterVertically) {
+    val read = when (row) { is ChapterRow.Local -> row.read; is ChapterRow.Remote -> row.read; is ChapterRow.Tracked -> row.read }
+    val click = if (row is ChapterRow.Tracked) Modifier.combinedClickable(onClick = { actions.onToggleRead(row) }, onLongClick = { actions.onReadUpTo(row) }) else Modifier.clickable { actions.onRead(row) }
+    Row(Modifier.fillMaxWidth().then(click).padding(start = 16.dp, end = 4.dp).height(if (row is ChapterRow.Tracked) 48.dp else 56.dp).testTag("chapter_${row.number}"), verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.manga_chapter_dash, row.number), style = MaterialTheme.typography.bodyLarge, color = if (read) Palette.TextMuted else Palette.Text, modifier = Modifier.weight(1f))
         when (row) {
             is ChapterRow.Remote -> {
@@ -707,12 +711,12 @@ private fun ChapterItem(row: ChapterRow, actions: MangaTitleActions) {
                     else -> Text("\u2066${d.donePages}/${d.totalPages}\u2069", style = MaterialTheme.typography.bodySmall, color = Palette.Accent, modifier = Modifier.padding(horizontal = 12.dp))
                 }
             }
-            is ChapterRow.Local -> Unit
+            is ChapterRow.Local, is ChapterRow.Tracked -> Unit
         }
         IconButton(onClick = { actions.onToggleRead(row) }, modifier = Modifier.testTag("eye_${row.number}")) {
             Icon(if (read) Icons.Filled.Visibility else Icons.Outlined.Visibility, stringResource(R.string.cd_mark_read), tint = if (read) Palette.Accent else Palette.RefIcon)
         }
-        val canDelete = row is ChapterRow.Local || (row as ChapterRow.Remote).download != null
+        val canDelete = row is ChapterRow.Local || (row as? ChapterRow.Remote)?.download != null
         if (canDelete) IconButton(onClick = { actions.onDelete(row.key) }, modifier = Modifier.testTag("trash_${row.number}")) {
             Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = Palette.RefIcon)
         }
@@ -733,7 +737,7 @@ fun MangaTitleScreen(onBack: () -> Unit, onGenre: (String) -> Unit, onRead: (Int
                 val ok = row is ChapterRow.Local || ui.providerAvailable
                 if (ok) onRead(vm.id, row.key)
             },
-            onToggleRead = { vm.toggleRead(it) }, onDownload = { vm.download(it) }, onDownloadAll = { vm.downloadAll() }, onDelete = { vm.delete(it) },
+            onToggleRead = { vm.toggleRead(it) }, onReadUpTo = { vm.markReadUpTo(it) }, onDownload = { vm.download(it) }, onDownloadAll = { vm.downloadAll() }, onDelete = { vm.delete(it) },
             onOpenTitle = onOpenTitle,
         ),
         initialTab = start,

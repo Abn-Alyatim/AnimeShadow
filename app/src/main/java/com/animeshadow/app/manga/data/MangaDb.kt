@@ -92,6 +92,10 @@ data class MangaLibraryEntity(
     val updatedAt: Long = 0,
 )
 
+/** v1.5.0: chapters ticked as read in the tracking list (no reader needed), like the anime episodes. */
+@Entity(tableName = "manga_read", primaryKeys = ["mangaId", "number"])
+data class MangaReadEntity(val mangaId: Int, val number: Int, val readAt: Long)
+
 /** Reading history (one row per chapter read; the newest per title is shown). */
 @Entity(tableName = "manga_history", indices = [Index("mangaId")])
 data class MangaHistoryEntity(
@@ -197,9 +201,16 @@ interface MangaDao {
     @Upsert suspend fun upsertEntry(e: MangaLibraryEntity)
     @Transaction @Query("SELECT * FROM manga_library WHERE status IS NOT NULL ORDER BY updatedAt DESC") fun observeLibrary(): Flow<List<LibraryRow>>
     @Transaction @Query("SELECT * FROM manga_library WHERE favorite = 1 ORDER BY updatedAt DESC") fun observeFavorites(): Flow<List<LibraryRow>>
+    @Transaction @Query("SELECT * FROM manga_library ORDER BY updatedAt DESC") suspend fun allLibrary(): List<LibraryRow>
     @Query("DELETE FROM manga_library WHERE status IS NULL AND favorite = 0 AND userScore IS NULL") suspend fun pruneEntries()
 
     // ------------------------------------------------------------------ history (manga only)
+    @Query("SELECT number FROM manga_read WHERE mangaId = :id") fun observeReadChapters(id: Int): Flow<List<Int>>
+    @Query("SELECT * FROM manga_read") suspend fun allRead(): List<MangaReadEntity>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertRead(rows: List<MangaReadEntity>)
+    @Query("DELETE FROM manga_read WHERE mangaId = :id AND number = :n") suspend fun deleteRead(id: Int, n: Int)
+    @Query("DELETE FROM manga_read WHERE mangaId = :id") suspend fun deleteAllRead(id: Int)
+    @Query("SELECT MAX(number) FROM manga_read WHERE mangaId = :id") suspend fun maxRead(id: Int): Int?
     @Upsert suspend fun upsertHistory(h: MangaHistoryEntity)
     @Query("SELECT * FROM manga_history WHERE chapterKey = :key") suspend fun history(key: String): MangaHistoryEntity?
     @Transaction
@@ -261,8 +272,8 @@ interface DownloadDao {
 }
 
 @Database(
-    entities = [MangaEntity::class, MangaFeedEntity::class, MangaLibraryEntity::class, MangaHistoryEntity::class, DownloadEntity::class],
-    version = 2,
+    entities = [MangaEntity::class, MangaFeedEntity::class, MangaLibraryEntity::class, MangaHistoryEntity::class, DownloadEntity::class, MangaReadEntity::class],
+    version = 3,
     exportSchema = false,
 )
 abstract class MangaDatabase : RoomDatabase() {
@@ -280,6 +291,13 @@ abstract class MangaDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `manga` ADD COLUMN `relationsJson` TEXT")
                 db.execSQL("ALTER TABLE `manga` ADD COLUMN `malScore` REAL")
                 db.execSQL("ALTER TABLE `manga` ADD COLUMN `malScoredBy` INTEGER")
+            }
+        }
+
+        /** 1.4.0 → 1.5.0: the chapter tracking list (read ticks); nothing else changes. */
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `manga_read` (`mangaId` INTEGER NOT NULL, `number` INTEGER NOT NULL, `readAt` INTEGER NOT NULL, PRIMARY KEY(`mangaId`, `number`))")
             }
         }
     }

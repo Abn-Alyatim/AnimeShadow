@@ -165,10 +165,18 @@ class V11InteractionTest {
     // ---------- the status is inline (anchored menu on the row), not a dialog ----------
     @Test fun status_changes_from_the_inline_menu() {
         var picked: WatchStatus? = null
-        set { DetailsContent(ui(), DetailsActions(onStatus = { picked = it }), 0) }
+        // v1.5.0: «شاهدته» is offered only once the show has finished airing (One Piece is airing in the fixture).
+        set { DetailsContent(ui().copy(anime = Fixtures.onePieceTranslated.copy(status = "FINISHED", nextEpisode = null)), DetailsActions(onStatus = { picked = it }), 0) }
         compose.onNodeWithTag("my_list").performClick()
         compose.onNodeWithTag("status_COMPLETED").performClick()
         assertEquals(WatchStatus.COMPLETED, picked)
+    }
+
+    @Test fun airing_show_has_no_completed_status() {
+        set { DetailsContent(ui(), DetailsActions(), 0) }
+        compose.onNodeWithTag("my_list").performClick()
+        compose.onNodeWithTag("status_WATCHING").assertExists()
+        compose.onNodeWithTag("status_COMPLETED").assertDoesNotExist()
     }
 
     // ---------- item 9: long-press copy, poster viewer ----------

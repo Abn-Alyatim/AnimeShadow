@@ -34,5 +34,10 @@
 - أماكن الإعلانات في التطبيق: بانر صغير تحت القوائم، وإعلان بيني واحد كحد أقصى كل 6 شاشات (ومرة كل 3 دقائق بالأكثر). ما في إعلانات في شاشة البداية ولا تسجيل الدخول ولا قارئ المانجا ولا الشات.
 
 ### للمطوّر (أنا): كيف تدخل الأرقام في البناء
-`./gradlew assembleRelease -PadmobAppId=ca-app-pub-…~… -PadmobBanner=ca-app-pub-…/… -PadmobInterstitial=ca-app-pub-…/…`
-(أو نفس الأسماء في local.properties: admob.appId / admob.banner / admob.interstitial). بدونها يبني بأرقام Google التجريبية.
+من 1.5.0 يكفي تعديل local.properties (لا يُرفع إلى GitHub):
+```
+ADMOB_APP_ID=ca-app-pub-…~…
+ADMOB_BANNER_ID=ca-app-pub-…/…
+ADMOB_INTERSTITIAL_ID=ca-app-pub-…/…
+```
+أو `-PADMOB_APP_ID=… -PADMOB_BANNER_ID=… -PADMOB_INTERSTITIAL_ID=…` (الأسماء القديمة admobAppId / admob.appId ما زالت تعمل). الفارغ أو الغائب = بدون إعلانات نهائياً (لا بانر ولا فراغ مكانه، ولا تشغيل لمكتبة الإعلانات). من 1.5.0.

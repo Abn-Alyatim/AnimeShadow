@@ -187,6 +187,11 @@ sealed interface ChapterRow {
         override val key: String get() = download.chapterKey
         override val number: String get() = download.chapterNumber
     }
+    /** v1.5.0: tracking row (no reader source): «الفصل-N» with a read tick, like the anime episodes. */
+    data class Tracked(val n: Int, val read: Boolean) : ChapterRow {
+        override val key: String get() = "t$n"
+        override val number: String get() = n.toString()
+    }
 }
 
 data class MangaTitleUi(
@@ -202,6 +207,8 @@ data class MangaTitleUi(
     val translating: Boolean = false,
 )
 
+private data class Tracking(val rem: List<ProviderChapter>, val flags: Triple<Boolean, Boolean, Boolean>, val translating: Boolean, val read: Set<Int>, val count: Int?)
+
 @HiltViewModel
 class MangaTitleViewModel @Inject constructor(
     private val repo: MangaRepository,
@@ -214,22 +221,31 @@ class MangaTitleViewModel @Inject constructor(
     private val flags = MutableStateFlow(Triple(false, true, false)) // chaptersLoading, newestFirst, failed
     /** v1.3.1: «جارٍ الترجمة…» only while a translation is really running (1.3.0 showed it forever after a failure). */
     private val translatingNow = MutableStateFlow(false)
+    /** v1.5.0: how many chapters the tracking list shows (AniList count / MangaDex latest); null = still looking. */
+    private val trackedCount = MutableStateFlow<Int?>(null)
 
     val ui: StateFlow<MangaTitleUi> = combine(
         repo.observe(id), repo.observeEntry(id), downloads.observeTitleDownloads(id), repo.observeTitleHistory(id),
-        combine(remote, flags, translatingNow) { r, f, t -> Triple(r, f, t) },
-    ) { m, e, dls, hist, (rem, f, t) ->
-        build(m, e, dls, hist, rem, f.first, f.second, f.third).let { it.copy(translating = t && m?.descriptionAr == null && m?.description != null) }
+        combine(remote, flags, translatingNow, repo.observeReadChapters(id), trackedCount) { r, f, t, rd, tc -> Tracking(r, f, t, rd.toSet(), tc) },
+    ) { m, e, dls, hist, tr ->
+        val (rem, f, t) = Triple(tr.rem, tr.flags, tr.translating)
+        build(m, e, dls, hist, rem, f.first, f.second, f.third, tr.read, tr.count).let { it.copy(translating = t && m?.descriptionAr == null && m?.description != null) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MangaTitleUi(downloadedOnly = downloadedOnly))
 
     private fun build(
         m: MangaEntity?, e: MangaLibraryEntity?, dls: List<DownloadEntity>, hist: List<MangaHistoryEntity>,
         rem: List<ProviderChapter>, loading: Boolean, newest: Boolean, failed: Boolean,
+        readTicks: Set<Int> = emptySet(), tracked: Int? = 0,
     ): MangaTitleUi {
         val byKey = dls.associateBy { it.chapterKey }
         val readKeys = hist.filter { it.finished }.map { it.chapterKey }.toSet() + dls.filter { it.read }.map { it.chapterKey }
         val rows: List<ChapterRow> = if (downloadedOnly || !repo.providerAvailable) {
-            if (downloadedOnly) dls.filter { it.state == com.animeshadow.app.manga.data.DownloadState.DONE }.map { ChapterRow.Local(it, it.chapterKey in readKeys) } else emptyList()
+            if (downloadedOnly) dls.filter { it.state == com.animeshadow.app.manga.data.DownloadState.DONE }.map { ChapterRow.Local(it, it.chapterKey in readKeys) }
+            else {
+                // v1.5.0 tracking list: AniList / MangaDex count, never fewer than what the user already ticked
+                val n = maxOf(tracked ?: 0, readTicks.maxOrNull() ?: 0, e?.lastChapter?.toDoubleOrNull()?.toInt() ?: 0)
+                (1..n).map { ChapterRow.Tracked(it, it in readTicks) }
+            }
         } else {
             rem.map { c ->
                 val key = ChapterProviders.chapterKey(ChapterProviders.active.id, c.id)
@@ -239,7 +255,7 @@ class MangaTitleViewModel @Inject constructor(
         val sorted = rows.sortedBy { it.number.toDoubleOrNull() ?: 0.0 }.let { if (newest) it.reversed() else it }
         return MangaTitleUi(
             manga = m, entry = e, downloadedOnly = downloadedOnly, providerAvailable = repo.providerAvailable,
-            chapters = sorted, chaptersLoading = loading, newestFirst = newest,
+            chapters = sorted, chaptersLoading = loading || (!downloadedOnly && !repo.providerAvailable && tracked == null), newestFirst = newest,
             continueRow = continueFrom(rows, hist), failed = failed,
             translating = m != null && m.description != null && m.descriptionAr == null,
         )
@@ -255,6 +271,11 @@ class MangaTitleViewModel @Inject constructor(
     }
 
     private suspend fun loadChapters() {
+        if (!downloadedOnly && !repo.providerAvailable) {
+            val m = repo.observe(id).first()
+            trackedCount.value = m?.let { runCatching { repo.trackedChapterCount(it) }.getOrNull() } ?: 0
+            return
+        }
         if (downloadedOnly || !repo.providerAvailable) return
         val m = repo.observe(id).first() ?: return
         flags.value = flags.value.copy(first = true)
@@ -271,8 +292,11 @@ class MangaTitleViewModel @Inject constructor(
         ui.value.chapters.filterIsInstance<ChapterRow.Remote>().filter { it.download == null }.sortedBy { it.chapter.numberValue }.forEach { downloads.enqueue(m, it.chapter) }
     }
     fun delete(key: String) = viewModelScope.launch { downloads.deleteChapter(key) }
-    fun toggleRead(row: ChapterRow) = viewModelScope.launch { downloads.setRead(row.key, !rowRead(row)) }
-    private fun rowRead(row: ChapterRow) = when (row) { is ChapterRow.Local -> row.read; is ChapterRow.Remote -> row.read }
+    fun toggleRead(row: ChapterRow) = viewModelScope.launch {
+        if (row is ChapterRow.Tracked) repo.setChapterRead(id, row.n, !row.read) else downloads.setRead(row.key, !rowRead(row))
+    }
+    fun markReadUpTo(row: ChapterRow) = viewModelScope.launch { (row as? ChapterRow.Tracked)?.let { repo.markReadUpTo(id, it.n) } }
+    private fun rowRead(row: ChapterRow) = when (row) { is ChapterRow.Local -> row.read; is ChapterRow.Remote -> row.read; is ChapterRow.Tracked -> row.read }
 
     companion object {
         /** «تابع الفصل N»: the last chapter opened if unfinished, else the one after it, else the first one. */

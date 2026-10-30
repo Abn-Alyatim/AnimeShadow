@@ -27,6 +27,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,10 +62,23 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** What the login screen tells the user (calm Arabic, no retry button). */
-enum class LoginMessage { NOT_CONFIGURED, NO_ACCOUNT, FAILED, DONE }
+enum class LoginMessage { NOT_CONFIGURED, NO_ACCOUNT, FAILED, DONE, DEVELOPER, NETWORK, PLAY_SERVICES, DONE_OFFLINE }
+
+/** v1.5.0: clear Arabic for each failure (error 10 says exactly what is missing in Google Cloud). */
+@Composable
+fun loginMessageText(m: LoginMessage): String? = when (m) {
+    LoginMessage.NOT_CONFIGURED -> stringResource(R.string.login_not_ready)
+    LoginMessage.DEVELOPER -> stringResource(R.string.login_error_10)
+    LoginMessage.NO_ACCOUNT -> stringResource(R.string.google_no_account)
+    LoginMessage.NETWORK -> stringResource(R.string.login_network)
+    LoginMessage.PLAY_SERVICES -> stringResource(R.string.login_play_services)
+    LoginMessage.FAILED -> stringResource(R.string.login_failed_generic)
+    LoginMessage.DONE_OFFLINE -> stringResource(R.string.login_done_offline)
+    LoginMessage.DONE -> null
+}
 
 @HiltViewModel
-class LoginViewModel @Inject constructor(private val repo: GoogleAccountRepository) : ViewModel() {
+class LoginViewModel @Inject constructor(private val repo: GoogleAccountRepository, private val api: com.animeshadow.app.social.SocialApi? = null) : ViewModel() {
     /** Swapped in tests. */
     var source: GoogleSignInSource = CredentialManagerSignIn()
     private val _busy = MutableStateFlow(false)
@@ -77,9 +92,20 @@ class LoginViewModel @Inject constructor(private val repo: GoogleAccountReposito
             _busy.value = true
             val r = try { source.signIn(activity, repo.webClientId) } finally { _busy.value = false }
             when (r) {
-                is GoogleSignInResult.Success -> { repo.save(r.account); _events.send(LoginMessage.DONE) }
+                is GoogleSignInResult.Success -> {
+                    repo.save(r.account)
+                    // v1.5.0: link to the AnimeShadow server (friends, chat, Pro). The library works without it.
+                    val linked = if (api != null && r.idToken.isNotBlank()) {
+                        _busy.value = true
+                        try { runCatching { api.signIn(r.idToken) }.getOrNull()?.also { repo.saveSession(it.token, it.me) } } finally { _busy.value = false }
+                    } else null
+                    _events.send(if (linked != null || api == null) LoginMessage.DONE else LoginMessage.DONE_OFFLINE)
+                }
                 GoogleSignInResult.NotConfigured -> _events.send(LoginMessage.NOT_CONFIGURED)
+                GoogleSignInResult.Developer -> _events.send(LoginMessage.DEVELOPER)
                 GoogleSignInResult.NoAccount -> _events.send(LoginMessage.NO_ACCOUNT)
+                GoogleSignInResult.Network -> _events.send(LoginMessage.NETWORK)
+                GoogleSignInResult.PlayServices -> _events.send(LoginMessage.PLAY_SERVICES)
                 is GoogleSignInResult.Failed -> _events.send(LoginMessage.FAILED)
                 GoogleSignInResult.Cancelled -> Unit
             }
@@ -92,7 +118,7 @@ class LoginViewModel @Inject constructor(private val repo: GoogleAccountReposito
  * the app name under it, and ONE way in: Google (round button). Nothing else (no email, no password).
  */
 @Composable
-fun LoginContent(onBack: () -> Unit, onGoogle: () -> Unit, busy: Boolean = false, snackbar: SnackbarHostState = remember { SnackbarHostState() }) {
+fun LoginContent(onBack: () -> Unit, onGoogle: () -> Unit, busy: Boolean = false, snackbar: SnackbarHostState = remember { SnackbarHostState() }, message: String? = null) {
     Scaffold(
         containerColor = Palette.Black,
         topBar = { AppTopBar(stringResource(R.string.login_title), onBack = onBack) },
@@ -125,6 +151,15 @@ fun LoginContent(onBack: () -> Unit, onGoogle: () -> Unit, busy: Boolean = false
                 stringResource(R.string.anilist_login_sub), style = MaterialTheme.typography.bodySmall, color = Palette.TextMuted,
                 textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp),
             )
+            // v1.5.0: the reason stays on screen (a snackbar vanished before error 10's explanation could be read).
+            androidx.compose.animation.AnimatedVisibility(visible = message != null, enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically()) {
+                Text(
+                    message.orEmpty(), style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp, textDirection = androidx.compose.ui.text.style.TextDirection.Rtl),
+                    color = Palette.RefText, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .border(1.dp, Palette.Divider, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(14.dp).testTag("login_message"),
+                )
+            }
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -135,18 +170,17 @@ fun LoginScreen(onBack: () -> Unit, vm: LoginViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val busy by vm.busy.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    var shown by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<LoginMessage?>(null) }
     LaunchedEffect(Unit) {
         vm.events.collect { m ->
             when (m) {
-                LoginMessage.DONE -> {
-                    android.widget.Toast.makeText(context, R.string.google_login_done, android.widget.Toast.LENGTH_SHORT).show()
+                LoginMessage.DONE, LoginMessage.DONE_OFFLINE -> {
+                    android.widget.Toast.makeText(context, if (m == LoginMessage.DONE) R.string.google_login_done else R.string.login_done_offline, android.widget.Toast.LENGTH_LONG).show()
                     onBack()
                 }
-                LoginMessage.NOT_CONFIGURED -> snackbar.showSnackbar(context.getString(R.string.google_not_configured))
-                LoginMessage.NO_ACCOUNT -> snackbar.showSnackbar(context.getString(R.string.google_no_account))
-                LoginMessage.FAILED -> snackbar.showSnackbar(context.getString(R.string.anilist_login_failed))
+                else -> shown = m
             }
         }
     }
-    LoginContent(onBack, { vm.signIn(context) }, busy, snackbar)
+    LoginContent(onBack, { shown = null; vm.signIn(context) }, busy, snackbar, shown?.let { loginMessageText(it) })
 }

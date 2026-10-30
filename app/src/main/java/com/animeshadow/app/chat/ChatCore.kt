@@ -178,10 +178,12 @@ interface ChatBackend {
 }
 
 /** Talks to the AnimeShadow module of Madyan's panel server; the AI key stays on that server. */
-class HttpChatBackend(private val baseUrl: String, private val client: OkHttpClient = defaultClient()) : ChatBackend {
+class HttpChatBackend(private val baseUrl: String, private val client: OkHttpClient = defaultClient(), private val session: () -> String? = { null }) : ChatBackend {
+    /** v1.5.0: a signed-in user is counted per account (Pro = larger daily limit). */
+    private fun Request.Builder.auth() = apply { session()?.let { header("Authorization", "Bearer $it") } }
     override suspend fun status(installId: String): WireStatus? = withContext(Dispatchers.IO) {
         runCatching {
-            client.newCall(Request.Builder().url("${baseUrl.trimEnd('/')}/animeshadow/v1/chat/status").header("X-AS-Install", installId).build()).execute().use { r ->
+            client.newCall(Request.Builder().url("${baseUrl.trimEnd('/')}/animeshadow/v1/chat/status").header("X-AS-Install", installId).auth().build()).execute().use { r ->
                 if (!r.isSuccessful) null else json.decodeFromString(WireStatus.serializer(), r.body!!.string())
             }
         }.getOrNull()
@@ -190,12 +192,13 @@ class HttpChatBackend(private val baseUrl: String, private val client: OkHttpCli
     override suspend fun send(installId: String, req: WireRequest): ChatResult = withContext(Dispatchers.IO) {
         try {
             val body = json.encodeToString(WireRequest.serializer(), req).toRequestBody("application/json".toMediaType())
-            client.newCall(Request.Builder().url("${baseUrl.trimEnd('/')}/animeshadow/v1/chat").header("X-AS-Install", installId).post(body).build()).execute().use { r ->
+            client.newCall(Request.Builder().url("${baseUrl.trimEnd('/')}/animeshadow/v1/chat").header("X-AS-Install", installId).auth().post(body).build()).execute().use { r ->
                 val text = r.body?.string().orEmpty()
                 if (r.isSuccessful) return@withContext ChatResult.Ok(json.decodeFromString(WireReply.serializer(), text))
                 val err = runCatching { json.decodeFromString(WireError.serializer(), text).error }.getOrNull()
                 when {
                     err?.code == "CHAT_NOT_READY" || err?.code == "CHAT_KEY_INVALID" || r.code == 404 -> ChatResult.NotReady
+                    err?.code == "MAINTENANCE" -> { com.animeshadow.app.social.MaintenanceBus.signal(); ChatResult.Failed(err.message.ifBlank { "التطبيق في صيانة قصيرة." }) }
                     r.code == 429 -> ChatResult.Limit(err?.message?.takeIf { it.isNotBlank() } ?: "وصلت حد اليوم ($DAILY_LIMIT رسالة). يتجدد بعد منتصف الليل.")
                     else -> ChatResult.Failed(err?.message?.takeIf { it.isNotBlank() } ?: "شادو سينباي مشغول الحين، جرّب بعد شوي.")
                 }
@@ -308,5 +311,5 @@ class ChatRepository(
         return Triple(updated, msgs, result)
     }
 
-    companion object { const val NOT_READY = "الخدمة قيد التجهيز" }
+    companion object { const val NOT_READY = "المساعد غير مفعّل بعد" }
 }

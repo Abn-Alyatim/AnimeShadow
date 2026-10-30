@@ -48,10 +48,9 @@ data class DetailsUi(
     val translating: Boolean = false,
 ) {
     /** Episodes to list: the announced total, else what is known to be out, else the user's progress. */
-    val episodeCount: Int get() {
-        val a = anime ?: return 0
-        return a.episodes ?: maxOf(a.latestEpisode ?: 0, entry?.progress ?: 0, watched.maxOrNull() ?: 0)
-    }
+    val episodeCount: Int get() = com.animeshadow.app.domain.Airing.listed(anime, entry?.progress ?: 0, watched.maxOrNull() ?: 0)
+    /** v1.5.0: episodes already out (markable); the rest of [episodeCount] are «لم تُعرض بعد». */
+    val releasedCount: Int get() = com.animeshadow.app.domain.Airing.released(anime, entry?.progress ?: 0, watched.maxOrNull() ?: 0)
     val progress: Int get() = entry?.progress ?: 0
     val progressFraction: Float get() = anime?.episodes?.takeIf { it > 0 }?.let { (progress.toFloat() / it).coerceIn(0f, 1f) } ?: 0f
 }
@@ -137,7 +136,7 @@ class DetailsViewModel @Inject constructor(
     /** Item 14: small eye in the episodes bar. All watched -> unmark all; otherwise mark all. Returns true if it marked. */
     fun toggleAllWatched(onDone: (marked: Boolean) -> Unit = {}) = viewModelScope.launch {
         val u = ui.value
-        val count = u.episodeCount
+        val count = u.releasedCount
         val allWatched = count > 0 && (1..count).all { it in u.watched }
         lastBulk = if (allWatched) library.unmarkAllWatched(animeId) else library.markAllWatched(animeId, count)
         onDone(!allWatched)
@@ -149,8 +148,10 @@ class DetailsViewModel @Inject constructor(
     }
     fun increment() = viewModelScope.launch { library.increment(animeId) }
     fun decrement() = viewModelScope.launch { library.decrement(animeId) }
-    fun setEpisode(episode: Int, watched: Boolean) = viewModelScope.launch { library.setEpisodeWatched(animeId, episode, watched) }
-    fun markUpTo(episode: Int) = viewModelScope.launch { library.markUpTo(animeId, episode) }
+    fun setEpisode(episode: Int, watched: Boolean) = viewModelScope.launch {
+        if (!watched || episode <= ui.value.releasedCount) library.setEpisodeWatched(animeId, episode, watched)
+    }
+    fun markUpTo(episode: Int) = viewModelScope.launch { library.markUpTo(animeId, episode.coerceAtMost(ui.value.releasedCount)) }
     fun toggleFavorite() = viewModelScope.launch { library.setFavoriteAnime(animeId, !ui.value.favorite) }
 
     fun setReminder(on: Boolean) = viewModelScope.launch {

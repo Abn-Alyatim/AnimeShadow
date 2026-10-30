@@ -121,6 +121,42 @@ class MangaRepository(
         }
     }
 
+    // ------------------------------------------------------------------ v1.5.0 chapter tracking list
+    fun observeReadChapters(id: Int) = dao.observeReadChapters(id)
+
+    /** Ticks/unticks one chapter; the title joins «أقرأه» and its «آخر فصل» follows the highest tick. */
+    suspend fun setChapterRead(mangaId: Int, number: Int, read: Boolean) {
+        if (read) dao.insertRead(listOf(MangaReadEntity(mangaId, number, clock.now()))) else dao.deleteRead(mangaId, number)
+        afterTick(mangaId)
+    }
+
+    /** Long-press: every chapter from 1 to [number] is read. */
+    suspend fun markReadUpTo(mangaId: Int, number: Int) {
+        if (number < 1) return
+        val now = clock.now()
+        dao.insertRead((1..number).map { MangaReadEntity(mangaId, it, now) })
+        afterTick(mangaId)
+    }
+
+    private suspend fun afterTick(mangaId: Int) {
+        val max = dao.maxRead(mangaId)
+        val e = dao.entry(mangaId) ?: MangaLibraryEntity(mangaId)
+        val m = dao.get(mangaId)
+        val total = m?.chapters
+        val status = when {
+            max == null -> e.status
+            total != null && max >= total && m.status == "FINISHED" -> ReadStatus.COMPLETED
+            e.status == null || e.status == ReadStatus.PLAN_TO_READ -> ReadStatus.READING
+            else -> e.status
+        }
+        dao.upsertEntry(e.copy(lastChapter = max?.toString() ?: e.lastChapter, status = status, updatedAt = clock.now()))
+        dao.pruneEntries()
+    }
+
+    /** Chapters to list: AniList's count, else the latest English chapter MangaDex knows (metadata only), else 0. */
+    suspend fun trackedChapterCount(m: MangaEntity): Int = m.chapters?.takeIf { it > 0 }
+        ?: runCatching { MangaDexCount.latest(m.id, listOfNotNull(m.titleEnglish, m.titleRomaji)) }.getOrNull() ?: 0
+
     suspend fun lastPage(chapterKey: String): Int = dao.history(chapterKey)?.page ?: 0
 
     // ------------------------------------------------------------------ chapters (pluggable provider)

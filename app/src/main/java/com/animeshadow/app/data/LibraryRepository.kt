@@ -50,9 +50,11 @@ class LibraryRepository(private val db: AppDatabase, private val clock: Clock) {
     suspend fun entry(animeId: Int) = dao.get(animeId)
     suspend fun watchingIds() = dao.watchingIds()
 
-    suspend fun setStatus(animeId: Int, status: WatchStatus) = db.withTransaction {
+    suspend fun setStatus(animeId: Int, status0: WatchStatus) = db.withTransaction {
         val now = clock.now()
         val old = dao.get(animeId)
+        // v1.5.0: no «شاهدته» before the show has finished airing
+        val status = if (status0 == WatchStatus.COMPLETED && !com.animeshadow.app.domain.Airing.canComplete(animeDao.get(animeId))) WatchStatus.WATCHING else status0
         var progress = old?.progress ?: 0
         if (status == WatchStatus.COMPLETED) {
             val total = animeDao.get(animeId)?.episodes
@@ -160,7 +162,9 @@ class LibraryRepository(private val db: AppDatabase, private val clock: Clock) {
     suspend fun increment(animeId: Int): Int = db.withTransaction {
         val now = clock.now()
         val current = dao.get(animeId)?.progress ?: 0
-        val total = maxEpisodes(animeDao.get(animeId))
+        val a = animeDao.get(animeId)
+        // v1.5.0: an airing show only counts up to the episodes already out
+        val total = if (a != null && a.status != null && a.status != "FINISHED") com.animeshadow.app.domain.Airing.released(a, current).takeIf { it > 0 } ?: 0 else maxEpisodes(a)
         val next = current + 1
         if (total != null && next > total) return@withTransaction current
         dao.insertWatched(listOf(WatchedEpisodeEntity(animeId, next, now)))
